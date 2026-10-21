@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Green &amp; Tasty — Group Cart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --g900:#0B4F22; --g700:#0E6B2E; --g600:#14853A; --g500:#1FA34A; --g100:#DDF2E3; --g50:#F1F9F3;
+  --ink:#232323; --ink2:#5C5C5C; --muted:#8F8F8F; --line:#E8E8E8; --bg:#FFFFFF; --soft:#F7F7F5;
+  --red:#D93B3B; --red50:#FDEEEE; --amber:#9A6200; --amber50:#FFF6E5; --amberLine:#F5DFB3;
+  --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Poppins,system-ui,sans-serif;color:var(--ink);background:#e9ebe8;font-size:13px;line-height:1.45}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+
+/* ---------- frame ---------- */
+.frame{width:1440px;height:1013px;position:relative;overflow:hidden;background:#fff;margin:0 auto}
+.page{position:absolute;inset:0}
+.nav{height:64px;display:flex;align-items:center;padding:0 48px;gap:48px;border-bottom:1px solid var(--line)}
+.logo{font-weight:600;color:var(--g700);font-size:18px;letter-spacing:-.2px}
+.logo span{color:var(--g500)}
+.nav a{color:var(--ink2);text-decoration:none;font-size:14px}
+.nav a.on{color:var(--g700);border-bottom:2px solid var(--g700);padding-bottom:20px;margin-top:22px}
+.strip{background:var(--g100);color:var(--g900);text-align:center;padding:9px;font-size:13px}
+.crumbs{padding:14px 48px;color:var(--muted);font-size:12px}
+.hero{margin:0 48px;height:150px;border-radius:16px;background:linear-gradient(100deg,#eef7ef 0%,#e4efe2 55%,#cfe2c8 100%);padding:34px 40px}
+.hero small{color:var(--g700);font-weight:500;font-size:14px}
+.hero h1{font-size:40px;font-weight:500;margin-top:4px}
+.tabs-page{display:flex;gap:36px;margin:26px 48px 0;border-bottom:1px solid var(--line);font-size:14px}
+.tabs-page span{padding-bottom:10px;color:var(--ink2)}
+.tabs-page span.on{color:var(--g700);border-bottom:2px solid var(--g700)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin:24px 48px}
+.card{background:var(--soft);border-radius:16px;height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.card svg{width:120px;height:120px}
+.card b{font-weight:500;font-size:13px}
+.scrim{position:absolute;inset:0;background:rgba(30,40,30,.38)}
+
+/* ---------- drawer ---------- */
+.drawer{position:absolute;top:0;right:0;bottom:0;width:480px;background:var(--bg);display:flex;flex-direction:column;box-shadow:-12px 0 40px rgba(0,0,0,.12)}
+.d-head{height:64px;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:1px solid var(--line)}
+.d-head h2{font-size:18px;font-weight:500}
+.x{position:absolute;right:20px;top:20px;width:24px;height:24px;color:var(--muted)}
+.d-body{flex:1;overflow:auto;padding:16px 24px 24px}
+.d-foot{border-top:1px solid var(--line);padding:16px 24px 24px;background:#fff}
+
+/* reservation summary */
+.res{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r)}
+.res .ic{width:36px;height:36px;border-radius:9px;background:var(--g50);display:grid;place-items:center;color:var(--g700);flex:none}
+.res .t{flex:1;min-width:0}
+.res .t b{font-weight:500;font-size:13px;display:block}
+.res .t span{color:var(--muted);font-size:12px}
+.btn-ghost{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--g600);border-radius:8px;color:var(--g700);font-size:12px;font-weight:500;white-space:nowrap}
+.btn-ghost:hover{background:var(--g50)}
+.btn-ghost.sm{height:28px;padding:0 10px}
+
+/* people bar */
+.people{display:flex;align-items:center;gap:10px;margin:14px 0 4px}
+.stack{display:flex}
+.av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:600;color:#fff;border:2px solid #fff;flex:none}
+.stack .av+.av{margin-left:-8px}
+.av.empty{background:#fff;border:1.5px dashed #C9C9C9;color:var(--muted);line-height:1;font-size:13px;font-weight:400}
+.stack .av{font-size:10px}
+.av svg{display:block}
+.av.empty{display:flex;align-items:center;justify-content:center;height:28px;min-height:28px;max-height:28px;padding:0;overflow:hidden}
+body.full .frame{width:480px;height:auto;min-height:1013px;background:#fff}
+body.full .drawer{position:relative;margin-left:auto;bottom:auto;box-shadow:none}
+body.full .page,body.full .scrim{display:none}
+body.full .d-body{overflow:visible}
+.people .txt{font-size:12px;color:var(--ink2)}
+.people .txt b{color:var(--ink);font-weight:500}
+.progress{display:flex;gap:3px;margin-left:auto}
+.progress i{width:14px;height:4px;border-radius:2px;background:var(--line)}
+.progress i.on{background:var(--g500)}
+
+/* segmented */
+.seg{display:flex;background:var(--soft);border-radius:9px;padding:3px;margin:14px 0}
+.seg button{flex:1;height:32px;border-radius:7px;font-size:12px;font-weight:500;color:var(--ink2)}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* alert */
+.alert{display:flex;gap:10px;align-items:flex-start;background:var(--amber50);border:1px solid var(--amberLine);color:var(--amber);border-radius:var(--r);padding:10px 12px;font-size:12px;margin-bottom:14px}
+.alert svg{flex:none;margin-top:1px}
+
+/* person block */
+.person{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.person.owner{border-color:#CFE7D6}
+.p-head{display:flex;align-items:center;gap:10px;padding:12px 14px;width:100%;text-align:left}
+.p-head .nm{flex:1;min-width:0}
+.p-head .nm b{font-weight:500;font-size:13px}
+.p-head .nm small{display:block;color:var(--muted);font-size:11px}
+.badge{display:inline-block;font-size:10px;font-weight:500;padding:1px 7px;border-radius:20px;margin-left:6px;vertical-align:1px}
+.badge.org{background:var(--g100);color:var(--g900)}
+.chip{font-size:11px;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.chip.ok{background:var(--g50);color:var(--g700)}
+.chip.wait{background:var(--soft);color:var(--ink2)}
+.chip.warn{background:var(--amber50);color:var(--amber)}
+.p-head .sum{font-weight:500;font-size:14px;min-width:44px;text-align:right}
+.chev{color:var(--muted);transition:transform .2s;flex:none}
+.person.open .chev{transform:rotate(180deg)}
+.p-body{display:none;border-top:1px solid var(--line);padding:4px 14px 10px}
+.person.open .p-body{display:block}
+
+/* owner item (editable, as in original design) */
+.item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.thumb{width:56px;height:56px;flex:none}
+.thumb.sm{width:40px;height:40px}
+.item .info{flex:1;min-width:0}
+.item .info b{font-weight:500;font-size:13px;display:block}
+.item .info small{color:var(--muted);font-size:11px}
+.stepper{display:flex;align-items:center;gap:10px;margin-top:6px}
+.stepper button{width:22px;height:22px;border-radius:6px;border:1px solid var(--line);color:var(--ink2);font-size:14px;line-height:1}
+.stepper button.plus{border-color:var(--g600);color:var(--g700)}
+.stepper span{min-width:10px;text-align:center;font-size:12px}
+.item .right{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end}
+.item .price{color:var(--g700);font-weight:500;font-size:14px}
+.trash{color:#9a9a9a}
+.trash:hover{color:var(--red)}
+
+/* guest line (read-only) */
+.line{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.line:last-of-type{border-bottom:0}
+.line .info{flex:1;min-width:0}
+.line .info b{font-weight:400;font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.line .info small{color:var(--muted);font-size:11px}
+.line .lt{font-weight:500;font-size:13px}
+.line.na .info b,.line.na .lt{color:var(--muted)}
+.line.na .lt{text-decoration:line-through}
+.line.na .thumb{filter:grayscale(1);opacity:.55}
+.tag-na{display:inline-block;font-size:10px;font-weight:500;color:var(--red);background:var(--red50);padding:1px 6px;border-radius:4px;margin-left:4px}
+.p-meta{display:flex;justify-content:space-between;align-items:center;padding-top:8px;color:var(--muted);font-size:11px}
+
+.nodish{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0 4px;color:var(--muted);font-size:12px}
+.pending{display:flex;align-items:center;gap:10px;border:1.5px dashed #D6D6D6;border-radius:12px;padding:12px 14px;color:var(--ink2);font-size:12px}
+.pending .grow{flex:1}
+
+/* by dish */
+.dish{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.dish .info{flex:1;min-width:0}
+.dish .info b{font-weight:500;font-size:13px}
+.dish .who{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.dish .who span{font-size:11px;background:var(--soft);color:var(--ink2);padding:1px 8px;border-radius:20px}
+.qty{font-weight:600;font-size:15px;color:var(--g700);min-width:36px;text-align:center}
+.dish .lt{font-weight:500;min-width:40px;text-align:right}
+.dish.na{opacity:.6}
+.dish.na .lt{text-decoration:line-through}
+.hint{font-size:11px;color:var(--muted);margin:2px 0 4px}
+
+/* footer */
+.row{display:flex;justify-content:space-between;color:var(--ink2);font-size:12px;margin-bottom:6px}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
+.total span{font-size:14px;font-weight:500}
+.total b{font-size:22px;font-weight:600;color:var(--g700)}
+.fresh{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11px;margin-bottom:14px}
+.fresh button{color:var(--g700);font-size:11px;font-weight:500;display:inline-flex;gap:4px;align-items:center}
+.primary{width:100%;height:46px;border-radius:9px;background:linear-gradient(90deg,var(--g700),var(--g600));color:#fff;font-weight:500;font-size:14px}
+.primary:disabled{background:#cfd8d1;cursor:not-allowed}
+
+/* empty / inactive */
+.empty{text-align:center;padding:26px 10px 8px}
+.empty h3{font-size:15px;font-weight:500;margin:12px 0 4px}
+.empty p{color:var(--muted);font-size:12px;max-width:300px;margin:0 auto}
+.linkbox{display:flex;gap:8px;margin:16px auto 0;max-width:400px}
+.linkbox .btn-ghost{height:36px}
+.linkbox input{flex:1;height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font-family:inherit;font-size:12px;color:var(--ink2);background:var(--soft)}
+.section-t{font-size:13px;font-weight:500;margin:6px 0 4px;display:flex;justify-content:space-between;align-items:center}
+.section-t small{color:var(--muted);font-weight:400}
+
+.notice{display:flex;gap:10px;align-items:flex-start;background:var(--g50);border:1px solid #CFE7D6;border-radius:var(--r);padding:12px;color:var(--g900);font-size:12px;margin-bottom:12px}
+
+.toast{position:absolute;left:50%;bottom:150px;transform:translateX(-50%) translateY(20px);background:#1f2a22;color:#fff;font-size:12px;padding:10px 14px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* state switcher (prototype only) */
+.switch{position:fixed;left:16px;top:16px;background:#fff;border-radius:12px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:4px;z-index:9;width:200px}
+.switch p{font-size:11px;color:var(--muted);padding:0 6px 4px}
+.switch a{font-size:12px;color:var(--ink2);text-decoration:none;padding:6px 8px;border-radius:6px}
+.switch a.on{background:var(--g50);color:var(--g700);font-weight:500}
+body.export .switch{display:none}
+@media (max-width:1700px){body:not(.export) .frame{transform:scale(.8);transform-origin:top center;margin-bottom:-200px}}
+</style>
+</head>
+<body>
+<nav class="switch" id="switch"><p>Prototype states</p></nav>
+
+<div class="frame">
+  <div class="page">
+    <div class="nav"><div class="logo">Green<span>&amp;</span>Tasty</div><a class="on">Main page</a><a>Book a Table</a></div>
+    <div class="strip">You are making a pre-order for the reservation at Green &amp; Tasty, Downtown · Fri, 24 Oct, 19:00</div>
+    <div class="crumbs">Main page &nbsp;›&nbsp; Menu</div>
+    <div class="hero"><small>Green &amp; Tasty Restaurants</small><h1>Menu</h1></div>
+    <div class="tabs-page"><span class="on">Appetizers</span><span>Main Courses</span><span>Desserts</span></div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="scrim"></div>
+  <aside class="drawer" id="drawer"></aside>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const Q=new URLSearchParams(location.search), FULL=Q.has('full');
+/* ---------------- data ---------------- */
+const DISH = {
+  straw:  {n:'Fresh Strawberry Mint Salad', p:17, c:['#2f7a3a','#d8343f','#7cc36b']},
+  potato: {n:'Roasted Sweet Potato & Lentil Salad', p:10, c:['#d98b2b','#6c8f3a','#b9733c']},
+  aspar:  {n:'Green Asparagus Salad', p:12, c:['#9bc46b','#cfe3a4','#7aa84a'], na:true},
+  quinoa: {n:'Quinoa Bowl with Avocado', p:15, c:['#e9d6a8','#5f9e4b','#c49a5a']},
+  berry:  {n:'Berry Yogurt Parfait', p:9, c:['#c9334f','#f4e7e1','#7f2a6e']},
+};
+const OWNER = {id:'me', name:'Oleh', color:'#0E6B2E', items:[{d:'straw',q:1},{d:'potato',q:1}]};
+const GUESTS = [
+  {id:'anna',  name:'Anna Koval',     color:'#3D7BD9', time:'18:20', items:[{d:'straw',q:2},{d:'quinoa',q:1}]},
+  {id:'max',   name:'Maksym Bondar',  color:'#C26A1B', time:'18:31', items:[{d:'potato',q:1},{d:'aspar',q:1},{d:'berry',q:1}]},
+  {id:'iryna', name:'Iryna Shevchuk', color:'#8E4FC4', time:null,    items:[]},
+];
+const TOTAL_GUESTS = 5;
+
+/* ---------------- helpers ---------------- */
+const $ = s => document.querySelector(s);
+const money = v => '$' + v;
+function plate([a,b,c], cls=''){
+  return `<svg class="thumb ${cls}" viewBox="0 0 56 56"><circle cx="28" cy="28" r="27" fill="#f3f1ec"/><circle cx="28" cy="28" r="21" fill="#fff" stroke="#ebe8e1"/>
+  <circle cx="22" cy="24" r="8" fill="${a}"/><circle cx="34" cy="22" r="6" fill="${b}"/><circle cx="31" cy="34" r="8" fill="${c}"/><circle cx="20" cy="34" r="4" fill="${b}"/><circle cx="36" cy="31" r="3" fill="${a}" opacity=".7"/></svg>`;
+}
+const ICON = {
+  x:`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+  chev:`<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6 6-6"/></svg>`,
+  link:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>`,
+  cal:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+  warn:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>`,
+  bell:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 21a2 2 0 004 0"/></svg>`,
+  refresh:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg>`,
+  trash:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>`,
+  info:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>`,
+  people:`<svg width="44" height="44" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="23" fill="#F1F9F3"/><circle cx="19" cy="20" r="5" stroke="#14853A" stroke-width="2"/><path d="M10 34c1.5-5 5-7 9-7s7.5 2 9 7" stroke="#14853A" stroke-width="2"/><circle cx="31" cy="19" r="4" stroke="#14853A" stroke-width="2" stroke-dasharray="3 2"/><path d="M30 26c4 0 7 2 8 6" stroke="#14853A" stroke-width="2" stroke-dasharray="3 2"/></svg>`,
+  clock:`<svg width="44" height="44" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="23" fill="#F7F7F5"/><circle cx="24" cy="24" r="11" stroke="#8F8F8F" stroke-width="2"/><path d="M24 18v6l4 3" stroke="#8F8F8F" stroke-width="2"/></svg>`,
+};
+const sumItems = items => items.reduce((s,i)=> s + (DISH[i.d].na ? 0 : DISH[i.d].p*i.q), 0);
+const initials = n => n.split(' ').map(w=>w[0]).join('').slice(0,2);
+function status(g){
+  if(!g.items.length) return `<span class="chip wait">Choosing…</span>`;
+  if(g.items.some(i=>DISH[i.d].na)) return `<span class="chip warn">Needs attention</span>`;
+  const n = g.items.reduce((s,i)=>s+i.q,0);
+  return `<span class="chip ok">${n} dish${n>1?'es':''}</span>`;
+}
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),1800)}
+
+/* ---------------- background grid ---------------- */
+$('#grid').innerHTML = ['straw','aspar','potato','quinoa','berry','straw','potato','quinoa'].map(k=>`<div class="card">${plate(DISH[k].c)}<b>${DISH[k].n}</b></div>`).join('');
+
+/* ---------------- pieces ---------------- */
+const head = `<div class="d-head"><h2>Cart</h2><button class="x" aria-label="Close">${ICON.x}</button></div>`;
+const resCard = (withInvite=true) => `<div class="res"><div class="ic">${ICON.cal}</div><div class="t"><b>Green &amp; Tasty · Downtown</b><span>Fri, 24 Oct · 19:00 · Table 4 · 5 guests</span></div>${withInvite?`<button class="btn-ghost" data-act="copy">${ICON.link} Invite</button>`:''}</div>`;
+
+function peopleBar(guests){
+  const joined = 1 + guests.length;
+  const chosen = [OWNER,...guests].filter(p=>p.items.length).length;
+  const av = [OWNER,...guests].map(p=>`<div class="av" style="background:${p.color}" title="${p.name}">${p.name[0]}</div>`).join('')
+           + Array(TOTAL_GUESTS-joined).fill('<div class="av empty"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></div>').join('');
+  const bars = Array(TOTAL_GUESTS).fill(0).map((_,i)=>`<i class="${i<chosen?'on':''}"></i>`).join('');
+  return `<div class="people"><div class="stack">${av}</div><div class="txt"><b>Joined ${joined} of ${TOTAL_GUESTS}</b> · ${chosen} chose dishes</div><div class="progress" title="${chosen} of ${TOTAL_GUESTS} have chosen">${bars}</div></div>`;
+}
+const seg = view => `<div class="seg"><button data-view="guest" class="${view==='guest'?'on':''}">By guest</button><button data-view="dish" class="${view==='dish'?'on':''}">By dish</button></div>`;
+const alertNA = `<div class="alert">${ICON.warn}<div><b style="font-weight:500">Some dishes are no longer available</b> — they aren’t counted in the total.</div></div>`;
+
+function ownerBlock(open=true){
+  const cnt = OWNER.items.reduce((s,i)=>s+i.q,0);
+  const items = OWNER.items.map((it,ix)=>{const d=DISH[it.d];return `
+    <div class="item">${plate(d.c)}<div class="info"><b>${d.n}</b><small>Expected ready time - 10 minutes</small>
+      <div class="stepper"><button data-dec="${ix}">−</button><span>${it.q}</span><button class="plus" data-inc="${ix}">+</button></div></div>
+      <div class="right"><button class="trash" data-del="${ix}" aria-label="Remove">${ICON.trash}</button><span class="price">${money(d.p*it.q)}</span></div></div>`}).join('');
+  return `<div class="person owner ${open?'open':''}" data-p="me">
+    <button class="p-head" data-toggle><div class="av" style="background:${OWNER.color}">${initials(OWNER.name)}</div>
+      <div class="nm"><b>My Pre-Order</b><span class="badge org">Organizer</span><small>${cnt} item${cnt!==1?'s':''} · you can edit</small></div>
+      <span class="sum">${money(sumItems(OWNER.items))}</span>${ICON.chev}</button>
+    <div class="p-body">${items || '<div class="nodish">No dishes selected yet</div>'}</div></div>`;
+}
+function guestBlock(g, open){
+  const n = g.items.reduce((s,i)=>s+i.q,0);
+  let body;
+  if(!g.items.length){
+    body = `<div class="nodish"><span>No dishes selected yet</span><button class="btn-ghost sm" data-act="remind" data-name="${g.name.split(' ')[0]}">${ICON.bell} Remind</button></div>`;
+  } else {
+    body = g.items.map(it=>{const d=DISH[it.d];return `
+      <div class="line ${d.na?'na':''}">${plate(d.c,'sm')}<div class="info"><b>${d.n}${d.na?'<span class="tag-na">Unavailable</span>':''}</b><small>${it.q} × ${money(d.p)}</small></div><span class="lt">${money(d.p*it.q)}</span></div>`}).join('')
+      + `<div class="p-meta"><span></span><span>Subtotal <b style="color:var(--ink);font-weight:500">${money(sumItems(g.items))}</b></span></div>`;
+  }
+  return `<div class="person ${open?'open':''}" data-p="${g.id}">
+    <button class="p-head" data-toggle><div class="av" style="background:${g.color}">${initials(g.name)}</div>
+      <div class="nm"><b>${g.name}</b><small>${g.items.length? 'Last change at '+g.time : 'Joined, hasn\u2019t chosen yet'}</small></div>
+      ${status(g)}<span class="sum">${money(sumItems(g.items))}</span>${ICON.chev}</button>
+    <div class="p-body">${body}</div></div>`;
+}
+function pendingBlock(guests){
+  const left = TOTAL_GUESTS - 1 - guests.length;
+  if(left<=0) return '';
+  return `<div class="pending"><div class="av empty"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></div><div class="grow">${left} invited guest${left>1?'s haven’t':' hasn’t'} joined yet</div><button class="btn-ghost sm" data-act="copy">${ICON.link} Copy link</button></div>`;
+}
+function byDish(guests){
+  const map = {};
+  [OWNER,...guests].forEach(p=>p.items.forEach(it=>{
+    (map[it.d] ||= {q:0, who:[]}); map[it.d].q += it.q;
+    map[it.d].who.push((p.id==='me'?'You':p.name.split(' ')[0]) + (it.q>1?' ×'+it.q:''));
+  }));
+  const rows = Object.entries(map).sort((a,b)=> (DISH[a[0]].na - DISH[b[0]].na) || b[1].q-a[1].q).map(([k,v])=>{const d=DISH[k];return `
+    <div class="dish ${d.na?'na':''}">${plate(d.c,'sm')}<div class="info"><b>${d.n}</b>${d.na?'<span class="tag-na">Unavailable</span>':''}<div class="who">${v.who.map(w=>`<span>${w}</span>`).join('')}</div></div>
+      <span class="qty">×${v.q}</span><span class="lt">${money(d.p*v.q)}</span></div>`}).join('');
+  return `<p class="hint">The same list the kitchen will receive — identical dishes are grouped.</p>${rows}`;
+}
+function footer(guests, {submit='Submit Pre-Order', disabled=false}={}){
+  const mine = sumItems(OWNER.items), theirs = guests.reduce((s,g)=>s+sumItems(g.items),0);
+  const withDishes = guests.filter(g=>g.items.length).length;
+  return `<div class="d-foot">
+    <div class="row"><span>My order</span><span>${money(mine)}</span></div>
+    <div class="row"><span>Guests’ orders (${withDishes})</span><span>${money(theirs)}</span></div>
+    <div class="total"><span>Grand Total</span><b>${money(mine+theirs)}</b></div>
+    <div class="fresh"><span>Updated at 18:42</span><button data-act="refresh">${ICON.refresh} Refresh</button></div>
+    <button class="primary" ${disabled?'disabled':''}>${submit}</button></div>`;
+}
+
+/* ---------------- screens ---------------- */
+let view = 'guest';
+const SCREENS = {
+  main:   {label:'1 · Owner — by guest', render(){
+    const g = GUESTS;
+    return head + `<div class="d-body">${resCard()}${peopleBar(g)}${seg(view)}${alertNA}
+      ${view==='guest' ? ownerBlock(FULL) + g.map((x,i)=>guestBlock(x, i<2 || FULL)).join('') + pendingBlock(g) : byDish(g)}</div>` + footer(g);
+  }},
+  dish:   {label:'2 · Owner — by dish', render(){ view='dish'; return SCREENS.main.render(); }},
+  empty:  {label:'3 · No guests joined', render(){
+    return head + `<div class="d-body">${resCard(false)}${peopleBar([])}
+      <div style="height:14px"></div>${ownerBlock(true)}
+      <div class="empty">${ICON.people}<h3>No guests have joined yet</h3><p>Share the link — friends can add their dishes to this pre-order, and you’ll see them here.</p>
+      <div class="linkbox"><input readonly value="greentasty.com/j/7Fq2-K9"><button class="btn-ghost" data-act="copy">${ICON.link} Copy invite link</button></div></div></div>` + footer([]);
+  }},
+  inactive:{label:'4 · Session inactive', render(){
+    return head + `<div class="d-body"><div class="empty" style="padding-top:120px">${ICON.clock}<h3>This pre-order session has expired or is no longer active</h3>
+      <p>The reservation was cancelled, completed or moved to another location. Order details are no longer available.</p>
+      <div style="margin-top:18px"><button class="btn-ghost">Go to My Reservations</button></div></div></div>`;
+  }},
+  guest:  {label:'5 · Guest view (via link)', render(){
+    const me = GUESTS[0];
+    const items = me.items.map((it,ix)=>{const d=DISH[it.d];return `
+      <div class="item">${plate(d.c)}<div class="info"><b>${d.n}</b><small>Expected ready time - 10 minutes</small>
+      <div class="stepper"><button>−</button><span>${it.q}</span><button class="plus">+</button></div></div>
+      <div class="right"><button class="trash">${ICON.trash}</button><span class="price">${money(d.p*it.q)}</span></div></div>`}).join('');
+    return head + `<div class="d-body"><div class="notice">${ICON.info}<div>You’re adding dishes to <b style="font-weight:500">Oleh’s table</b> · Fri, 24 Oct, 19:00.<br>Oleh will see your choice and send the order to the restaurant.</div></div>
+      <div class="section-t">My Pre-Order <small>as Anna Koval</small></div>${items}</div>
+      <div class="d-foot"><div class="total" style="border:0;margin-top:0;padding-top:0"><span>My total</span><b>${money(sumItems(me.items))}</b></div>
+      <div class="fresh"><span>Saved automatically</span><span></span></div><button class="primary">Done — back to menu</button></div>`;
+  }},
+};
+
+function render(){
+  const key = (location.hash.slice(1) || 'main');
+  view = key==='dish' ? 'dish' : 'guest';
+  $('#drawer').innerHTML = (SCREENS[key]||SCREENS.main).render();
+  $('#switch').innerHTML = '<p>Prototype states</p>' + Object.entries(SCREENS).map(([k,s])=>`<a href="#${k}" class="${k===key?'on':''}">${s.label}</a>`).join('');
+}
+document.addEventListener('click', e=>{
+  const t = e.target.closest('button'); if(!t) return;
+  if(t.dataset.view){ view = t.dataset.view; $('#drawer').innerHTML = SCREENS.main.render(); return; }
+  if(t.hasAttribute('data-toggle')){ t.parentElement.classList.toggle('open'); return; }
+  if(t.dataset.inc){ OWNER.items[t.dataset.inc].q++; rerender(); return; }
+  if(t.dataset.dec){ const it=OWNER.items[t.dataset.dec]; if(it.q>1){it.q--; rerender();} return; }
+  if(t.dataset.del){ OWNER.items.splice(t.dataset.del,1); rerender(); toast('Dish removed from your order'); return; }
+  const a = t.dataset.act;
+  if(a==='copy') toast('Invite link copied');
+  if(a==='remind') toast(`Reminder sent to ${t.dataset.name}`);
+  if(a==='refresh') toast('Order updated');
+});
+function rerender(){ const open=[...document.querySelectorAll('.person.open')].map(p=>p.dataset.p); $('#drawer').innerHTML=(SCREENS[location.hash.slice(1)]||SCREENS.main).render(); document.querySelectorAll('.person').forEach(p=>p.classList.toggle('open',open.includes(p.dataset.p))); }
+if(Q.has('export')) document.body.classList.add('export');
+if(FULL) document.body.classList.add('full');
+addEventListener('hashchange', render); render();
+</script>
+</body>
+</html>

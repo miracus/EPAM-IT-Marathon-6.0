@@ -1,0 +1,9 @@
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+# Office temp files
+~$*
+*.tmp
