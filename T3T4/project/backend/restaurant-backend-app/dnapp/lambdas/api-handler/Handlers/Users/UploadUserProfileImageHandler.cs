@@ -46,7 +46,7 @@ public class UploadUserProfileImageHandler : IApiRequestHandler
         var fileName = $"user_{userId}";
         var imageBytes = S3ImageService.GetImageBytesFromBase64(body.Base64Image);
 
-        var userImage = await _dbContext.LoadAsync<ProfileImage>(userId, new DynamoDBOperationConfig
+        var userImage = await _dbContext.LoadAsync<ProfileImage>(userId, new LoadConfig
         {
             OverrideTableName = ProfileImagesTableName
         });
@@ -80,7 +80,7 @@ public class UploadUserProfileImageHandler : IApiRequestHandler
         {
             UserId = userId,
             ImageKey = key
-        }, new DynamoDBOperationConfig { OverrideTableName = ProfileImagesTableName });
+        }, new SaveConfig { OverrideTableName = ProfileImagesTableName });
 
         return ResponseBuilder.CreateJsonResponse(200, "Photo was uploaded successfully!");
     }

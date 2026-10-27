@@ -34,7 +34,7 @@ public class Function
         var admins = await userService.GetUsersByGroupAsync(Roles.Admin.ToString());
         var emails = admins.Select(admin => admin.Attributes
                 .FirstOrDefault(a => a.Name == "email")?.Value)
-                .Where(email => !string.IsNullOrEmpty(email)).ToList();
+                .Where(email => !string.IsNullOrEmpty(email)).Select(email => email!).ToList();
 
         await emailService.SendEmailsWithAttachmentsAsync(emails, [locationReportFile, waiterReportFile], Subject, Body);
     }

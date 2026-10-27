@@ -293,7 +293,7 @@ public class ReportService : IReportService
         return result;
     }
 
-    public async Task<List<ReportHistoryBase>?> QueryReportsHistoryAsync(
+    public async Task<List<ReportHistoryBase>> QueryReportsHistoryAsync(
         string userId,
         ReportType reportType,
         string locationId,

@@ -5,13 +5,13 @@ namespace ReportSender.Entities.Reports;
 public class ReportHistoryWaiter : ReportHistoryBase
 {
     [JsonPropertyName("waiterId")]
-    public string WaiterId { get; set; }
+    public string WaiterId { get; set; } = default!;
 
     [JsonPropertyName("waiterName")]
-    public string WaiterName { get; set; }
+    public string WaiterName { get; set; } = default!;
 
     [JsonPropertyName("waiterEmail")]
-    public string WaiterEmail { get; set; }
+    public string WaiterEmail { get; set; } = default!;
 
     [JsonPropertyName("workingHours")]
     public double WorkingHours { get; set; }

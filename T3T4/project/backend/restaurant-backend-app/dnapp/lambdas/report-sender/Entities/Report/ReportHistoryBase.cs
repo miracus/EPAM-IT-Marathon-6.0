@@ -6,7 +6,7 @@ namespace ReportSender.Entities.Reports;
 public abstract class ReportHistoryBase
 {
     [JsonPropertyName("id")]
-    public string Id { get; set; }
+    public string Id { get; set; } = default!;
 
     [JsonPropertyName("reportType")]
     public ReportType ReportType { get; set; }
@@ -32,11 +32,11 @@ public abstract class ReportHistoryBase
     }
 
     [JsonPropertyName("userId")]
-    public string UserId { get; set; }
+    public string UserId { get; set; } = default!;
 
     [JsonPropertyName("locationId")]
-    public string LocationId { get; set; }
+    public string LocationId { get; set; } = default!;
 
     [JsonPropertyName("locationName")]
-    public string LocationName { get; set; }
+    public string LocationName { get; set; } = default!;
 }

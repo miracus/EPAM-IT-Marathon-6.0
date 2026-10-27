@@ -241,8 +241,7 @@ public class OrderServiceTests
         Assert.Equal(OrderStatus.Created, result.Status);
     }
 
-    [Theory]
-    [AutoData]
+    [Fact]
     public async Task GetOrderByReservationIdAsync_ShouldReturnNull_WhenOrderIsCancelled()
     {
         _mockOrderRepository.Setup(r => r.GetOrderByReservationIdAsync(It.IsAny<string>())).ReturnsAsync((Order?)null);
@@ -252,8 +251,7 @@ public class OrderServiceTests
         Assert.Null(result);
     }
 
-    [Theory]
-    [AutoData]
+    [Fact]
     public async Task GetOrderByReservationIdAsync_ShouldReturnNull_WhenNoOrderExists()
     {
         _mockOrderRepository.Setup(r => r.GetOrderByReservationIdAsync("res-1")).ReturnsAsync((Order?)null);
@@ -427,7 +425,7 @@ public class OrderServiceTests
 
         _mockReservationRepository.Setup(r => r.GetReservationByIdAsync(reservationId)).ReturnsAsync(reservation);
         _mockOrderRepository.Setup(r => r.GetOrderByReservationIdAsync(reservationId)).ReturnsAsync(order);
-        _mockDishService.Setup(s => s.GetDishByIdAsync(dishIdToFetch)).ReturnsAsync((Dish?)null);
+        _mockDishService.Setup(s => s.GetDishByIdAsync(dishIdToFetch)).ReturnsAsync((Dish)null!);
 
         await Assert.ThrowsAsync<ValidationException>(() =>
             _orderService.EditPreOrderAsync(customerId, reservationId, newDishes, _mockLambdaContext.Object));

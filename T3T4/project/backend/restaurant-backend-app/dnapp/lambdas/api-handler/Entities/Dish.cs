@@ -47,5 +47,5 @@ public class Dish
     public DishState State { get; set; }
 
     [DynamoDBProperty("locationId")]
-    public string LocationId { get; set; }
+    public string LocationId { get; set; } = default!;
 }

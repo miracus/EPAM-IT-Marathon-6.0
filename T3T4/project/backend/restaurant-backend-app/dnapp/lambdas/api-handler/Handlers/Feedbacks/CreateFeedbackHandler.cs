@@ -32,7 +32,7 @@ public class CreateFeedbackHandler : IApiRequestHandler
         }
 
         Roles? userRole = await GetUserRoleAsync(feedbackRequest!.UserId);
-        if (userRole is not null or Roles.Customer)
+        if (userRole is not null and not Roles.Customer)
         {
             return ResponseBuilder.CreateErrorResponse(403, "Only customers can create feedback.", context.Logger);
         }

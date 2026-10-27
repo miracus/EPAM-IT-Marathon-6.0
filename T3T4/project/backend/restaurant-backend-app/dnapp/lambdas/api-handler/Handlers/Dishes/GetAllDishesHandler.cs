@@ -24,7 +24,7 @@ public class GetAllDishesHandler : IApiRequestHandler
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public static readonly DynamoDBOperationConfig _dishesConfig = new()
+    public static readonly ScanConfig _dishesConfig = new()
     {
         OverrideTableName = DishesTableName,
     };
@@ -54,7 +54,7 @@ public class GetAllDishesHandler : IApiRequestHandler
             sortBy == DishSortingLabels.PopularityDescending)
         {
             orders = await _dbContext
-                .ScanAsync<global::APIHandler.Entities.Order>(new List<ScanCondition>(), new DynamoDBOperationConfig
+                .ScanAsync<global::APIHandler.Entities.Order>(new List<ScanCondition>(), new ScanConfig
                 {
                     OverrideTableName = ResourceNames.OrdersTableName
                 })

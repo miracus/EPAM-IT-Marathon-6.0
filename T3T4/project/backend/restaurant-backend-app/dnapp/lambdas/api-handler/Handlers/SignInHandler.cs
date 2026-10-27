@@ -8,6 +8,7 @@ using APIHandler.Helpers;
 using APIHandler.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -36,7 +37,7 @@ public class SignInHandler : IApiRequestHandler
 
         var (isValid, errorMessage) = ValidateRequest(signInRequest, context);
         if (!isValid)
-            return ResponseBuilder.CreateErrorResponse(400, errorMessage, context.Logger);
+            return ResponseBuilder.CreateErrorResponse(400, errorMessage ?? "Invalid request", context.Logger);
 
         var result = await TrySignInUserAsync(signInRequest, context);
         if (result is null)
@@ -76,7 +77,7 @@ public class SignInHandler : IApiRequestHandler
         }
     }
 
-    private static bool TryDeserializeRequest(APIGatewayProxyRequest request, out SignInRequest? signInRequest)
+    private static bool TryDeserializeRequest(APIGatewayProxyRequest request, [NotNullWhen(true)] out SignInRequest? signInRequest)
     {
         try
         {
