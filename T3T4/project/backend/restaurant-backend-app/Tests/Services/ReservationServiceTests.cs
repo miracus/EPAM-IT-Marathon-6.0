@@ -136,7 +136,7 @@ public class ReservationServiceTests
             .ReturnsAsync(table);
 
         _mockUserRepository
-            .Setup(r => r.GetUserByEmailAsync(request.CustomerEmail))
+            .Setup(r => r.GetUserByEmailAsync(request.CustomerEmail!))
             .ReturnsAsync(customer);
 
         // Act
@@ -620,7 +620,7 @@ public class ReservationServiceTests
         string callerId,
         string newTableId)
     {
-        reservation.WaiterId = null;
+        reservation.WaiterId = null!;
 
         _mockReservationRepository
             .Setup(r => r.GetReservationByIdAsync(reservation.Id))

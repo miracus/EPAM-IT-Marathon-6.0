@@ -68,8 +68,12 @@ public static class Mapper
                     / previousPeriodReports.Sum(r => r.OrdersProcessed) * 100), 2);
         }
 
-        var fullName = waiter?.Attributes.FirstOrDefault(a => a.Name == "given_name")?.Value ?? "Unknown"
-            + " " + waiter?.Attributes.FirstOrDefault(a => a.Name == "family_name")?.Value ?? "";
+        // Was: given ?? "Unknown" + " " + family -> '??' has the lowest precedence, so the surname was always dropped.
+        var givenName = waiter?.Attributes?.FirstOrDefault(a => a.Name == "given_name")?.Value;
+        var familyName = waiter?.Attributes?.FirstOrDefault(a => a.Name == "family_name")?.Value;
+        var fullName = $"{givenName} {familyName}".Trim();
+        if (fullName.Length == 0)
+            fullName = "Unknown";
 
         return new ReportHistoryWaiter
         {
@@ -79,7 +83,7 @@ public static class Mapper
             EndDate = endDate,
             WaiterId = reports.First().WaiterId,
             WaiterName = fullName,
-            WaiterEmail = waiter.Attributes.FirstOrDefault(a => a.Name == "email")?.Value ?? "Unknown",
+            WaiterEmail = waiter?.Attributes?.FirstOrDefault(a => a.Name == "email")?.Value ?? "Unknown",
             WorkingHours = Math.Round(reports.Sum(r => r.HoursWorked), 2),
             TotalOrders = reports.Sum(r => r.OrdersProcessed),
             AvgServiceFeedback = Math.Round(reports.Average(r => r.AverageServiceRating), 2),

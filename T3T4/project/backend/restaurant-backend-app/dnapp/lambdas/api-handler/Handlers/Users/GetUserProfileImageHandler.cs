@@ -32,7 +32,7 @@ public class GetUserProfileImageHandler : IApiRequestHandler
             return ResponseBuilder.CreateErrorResponse(400, "User ID is required.", context.Logger);
         }
 
-        var userImage = await _dbContext.LoadAsync<ProfileImage>(userId, new DynamoDBOperationConfig
+        var userImage = await _dbContext.LoadAsync<ProfileImage>(userId, new LoadConfig
         {
             OverrideTableName = ProfileImagesTableName
         });

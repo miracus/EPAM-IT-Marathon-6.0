@@ -185,11 +185,11 @@ public class ReportFileService : IReportFileService
 
                 table.Cell()
                     .Element(CellStyle)
-                    .Text(item.WorkingHours);
+                    .Text(item.WorkingHours.ToString());
 
                 table.Cell()
                     .Element(CellStyle)
-                    .Text(item.TotalOrders);
+                    .Text(item.TotalOrders.ToString());
 
                 table
                     .Cell()

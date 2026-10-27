@@ -20,7 +20,7 @@ public class DishRepository : IDishRepository
         _dynamoDbContext = dynamoDbContext ?? throw new ArgumentNullException(nameof(dynamoDbContext));
     }
 
-    public async Task<Dish> GetDishByIdAsync(string dishId)
+    public async Task<Dish?> GetDishByIdAsync(string dishId)
     {
         var dishLoadConfig = DynamoConfig.LoadConfig(DishTableName);
         return await _dynamoDbContext.LoadAsync<Dish>(dishId, dishLoadConfig);

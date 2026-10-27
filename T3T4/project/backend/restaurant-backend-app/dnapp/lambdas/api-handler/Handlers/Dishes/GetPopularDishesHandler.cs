@@ -22,7 +22,7 @@ public class GetPopularDishesHandler : IApiRequestHandler
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public static readonly DynamoDBOperationConfig _dishesConfig = new()
+    public static readonly ScanConfig _dishesConfig = new()
     {
         OverrideTableName = DishesTableName,
     };

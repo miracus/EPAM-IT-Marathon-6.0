@@ -9,6 +9,7 @@ using APIHandler.Models;
 using APIHandler.Models.Users;
 using APIHandler.Services.Waiters;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -78,7 +79,7 @@ public class RegistrationHandler : IApiRequestHandler
         return ResponseBuilder.CreateSuccessResponse("User registered and confirmed successfully");
     }
 
-    private static bool TryDeserializeRequest(APIGatewayProxyRequest request, out RegistrationRequest registrationRequest)
+    private static bool TryDeserializeRequest(APIGatewayProxyRequest request, [NotNullWhen(true)] out RegistrationRequest? registrationRequest)
     {
         try
         {

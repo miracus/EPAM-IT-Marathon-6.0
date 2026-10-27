@@ -24,7 +24,7 @@ public class GetDishesByLocationIdHandler : IApiRequestHandler
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    private static readonly DynamoDBOperationConfig dishesConfig = new()
+    private static readonly BatchGetConfig dishesConfig = new()
     { OverrideTableName = DishesTableName };
 
     public async Task<APIGatewayProxyResponse> HandleRequest(APIGatewayProxyRequest request, ILambdaContext context)
