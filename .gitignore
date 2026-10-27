@@ -23,6 +23,7 @@ tfplan
 # Deploy / build artefacts
 deploy-log-*.txt
 test-log-*.txt
+e2e-log-*.txt
 syndicate_venv/
 **/bin/
 **/obj/
