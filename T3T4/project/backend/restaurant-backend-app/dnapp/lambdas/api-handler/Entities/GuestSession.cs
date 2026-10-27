@@ -31,4 +31,8 @@ public class GuestSession
 
     [DynamoDBProperty("isSubmitted")]
     public bool IsSubmitted { get; set; }
+
+    /// <summary>Changes made by the reservation owner that the guest has not acknowledged yet (US16).</summary>
+    [DynamoDBProperty("notices")]
+    public List<GuestNotice>? Notices { get; set; }
 }

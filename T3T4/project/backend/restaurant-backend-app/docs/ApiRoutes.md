@@ -1180,30 +1180,83 @@ Response: 200 OK
 ```
 
 ### `POST` /group-reservations/{groupReservationId}/submit
-Response: 200 OK
+Owner only (Cognito). Merges dishes from **submitted** guest sessions by `dishId` (unavailable dishes are skipped), adds them to the reservation order, sets order status `SubmittedByCustomer` and group status `Submitted`.
+
+Request body:
 ```json
 {
-  "message": "Group reservation pre-order submitted successfully."
+  "reservationId": "string"
 }
 ```
-
-### `GET` /guest/groups/{groupReservationId}/sessions
 Response: 200 OK
 ```json
 [
-  {
-    "id": "string",
-    "groupReservationId": "string",
-    "guestName": "string",
-    "status": "string"
-  }
+  { "dishId": "dish1", "quantity": 3 },
+  { "dishId": "dish2", "quantity": 2 }
 ]
 ```
+Errors: `400` no submitted sessions / no dishes / order not found / reservation of another group, `403` not the owner, `404` reservation or group not found, `409` group already submitted or closed.
 
-### `DELETE` /guest/groups/{groupReservationId}/sessions/{guestSessionId}
+### `GET` /guest/groups/{groupReservationId}/sessions
+Owner only (Cognito). The legacy path `/guest/group/{groupReservationId}/sessions` returns the same.
+Owner session is always first. Unavailable dishes are listed but not counted in `total`.
+
 Response: 200 OK
 ```json
 {
-  "message": "Guest session removed from group successfully."
+  "participants": [
+    {
+      "id": "owner-session-123",
+      "type": "Owner",
+      "name": "Oleh",
+      "items": [ { "dish": { "id": "dish1", "name": "Spring Salad", "price": 19.0, "state": "Available" }, "quantity": 1 } ],
+      "total": 19.0,
+      "isSubmitted": false
+    },
+    {
+      "id": "session1",
+      "type": "Guest",
+      "name": "Anna",
+      "items": [ { "dish": { "id": "dish2", "name": "Tom Yum", "price": 22.0, "state": "Available" }, "quantity": 2 } ],
+      "total": 44.0,
+      "isSubmitted": true
+    }
+  ],
+  "total": 63.0,
+  "summaryByDish": [
+    { "dishId": "dish2", "name": "Tom Yum", "quantity": 2, "total": 44.0, "isAvailable": true },
+    { "dishId": "dish1", "name": "Spring Salad", "quantity": 1, "total": 19.0, "isAvailable": true }
+  ],
+  "hasUnavailableDishes": false,
+  "groupStatus": "Open"
+}
+```
+Errors: `403` not the owner, `404` group or reservation not found.
+
+### `DELETE` /guest/groups/{groupReservationId}/sessions/{guestSessionId}
+Owner only (Cognito). Removes a guest from the group; the owner's own session cannot be removed.
+
+Response: 200 OK — updated snapshot, same shape as `GET /guest/groups/{groupReservationId}/sessions`.
+
+Errors: `400` owner session / session of another group, `403` not the owner, `404` group or session not found, `409` group already submitted or closed.
+
+### `DELETE` /guest/groups/{groupReservationId}/sessions/{guestSessionId}/dishes/{dishId}
+Owner only (Cognito). Removes one dish from a participant's cart (US15). For guests a notice is stored so the guest sees what changed (US16).
+
+Response: 200 OK — updated snapshot, same shape as `GET /guest/groups/{groupReservationId}/sessions`.
+
+Errors: `403` not the owner, `404` group, session or dish not found, `409` group already submitted or closed.
+
+### `POST` /guest/sessions/{guestSessionId}/notices/ack
+Guest token (`Authorization: Bearer <guestSessionToken>`). Clears the notices returned in `GET /guest/sessions/{guestSessionId}` → `notices`:
+```json
+"notices": [
+  { "id": "string", "message": "The organizer removed Tom Yum from your order.", "dishId": "dish2", "createdAt": "2026-10-27T10:00:00Z" }
+]
+```
+Response: 200 OK
+```json
+{
+  "message": "Notices acknowledged."
 }
 ```
