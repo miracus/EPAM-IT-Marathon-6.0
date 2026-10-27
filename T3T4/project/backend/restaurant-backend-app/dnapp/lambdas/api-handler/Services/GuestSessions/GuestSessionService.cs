@@ -33,7 +33,15 @@ public class GuestSessionService(
 {
     public async Task<bool> IsAuthorizedAsync(string guestSessionToken, string guestSessionId)
     {
-        string hash = Convert.ToBase64String(SHA256.HashData(Convert.FromBase64String(guestSessionToken)));
+        // A malformed token is just an invalid token (401), not a server error.
+        if (string.IsNullOrWhiteSpace(guestSessionToken))
+            return false;
+
+        var tokenBytes = new byte[guestSessionToken.Length];
+        if (!Convert.TryFromBase64String(guestSessionToken, tokenBytes, out int bytesWritten))
+            return false;
+
+        string hash = Convert.ToBase64String(SHA256.HashData(tokenBytes.AsSpan(0, bytesWritten)));
         GuestSession? guestSession = await guestSessionRepository.GetByTokenHash(hash);
         if (guestSession is null)
             return false;

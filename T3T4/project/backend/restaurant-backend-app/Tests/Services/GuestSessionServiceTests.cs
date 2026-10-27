@@ -423,6 +423,18 @@ public class GuestSessionServiceTests
     }
 
     [Theory]
+    [InlineData("wrong-token")]
+    [InlineData("not base64!")]
+    [InlineData("")]
+    public async Task IsAuthorizedAsync_MalformedToken_ReturnsFalseWithoutThrowing(string token)
+    {
+        bool result = await _guestSessionService.IsAuthorizedAsync(token, "any-session");
+
+        Assert.False(result);
+        _mockGuestSessionRepository.Verify(r => r.GetByTokenHash(It.IsAny<string>()), Times.Never);
+    }
+
+    [Theory]
     [AutoData]
     public async Task IsAuthorizedAsync_ValidTokenAndId_ReturnsTrue(GuestSession guestSession, byte[] tokenBytes)
     {
