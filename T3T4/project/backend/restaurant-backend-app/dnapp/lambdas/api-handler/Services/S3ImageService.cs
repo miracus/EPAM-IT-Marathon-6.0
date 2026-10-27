@@ -2,8 +2,6 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using APIHandler.Constants;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
 using System;
 using System.IO;
 using System.Linq;
@@ -109,12 +107,27 @@ public class S3ImageService
         return sha.ComputeHash(a).SequenceEqual(sha.ComputeHash(b));
     }
 
-    private static string GetImageContentType(byte[] imgData)
+    /// <summary>
+    /// Detects the image MIME type from the file signature ("magic bytes").
+    /// Replaces SixLabors.ImageSharp, which was only used for this and has known vulnerabilities in 3.x.
+    /// </summary>
+    public static string GetImageContentType(byte[] imgData)
     {
-        using var image = Image.Load(imgData);
-        IImageFormat? format = image.Metadata.DecodedImageFormat 
-            ?? throw new InvalidOperationException("Invalid image format.");
+        ReadOnlySpan<byte> d = imgData;
 
-        return format.DefaultMimeType;
+        if (d.Length >= 3 && d[0] == 0xFF && d[1] == 0xD8 && d[2] == 0xFF)
+            return "image/jpeg";
+        if (d.Length >= 8 && d[..8].SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
+            return "image/png";
+        if (d.Length >= 6 && (d[..6].SequenceEqual("GIF87a"u8) || d[..6].SequenceEqual("GIF89a"u8)))
+            return "image/gif";
+        if (d.Length >= 12 && d[..4].SequenceEqual("RIFF"u8) && d[8..12].SequenceEqual("WEBP"u8))
+            return "image/webp";
+        if (d.Length >= 2 && d[0] == (byte)'B' && d[1] == (byte)'M')
+            return "image/bmp";
+        if (d.Length >= 4 && (d[..4].SequenceEqual(new byte[] { 0x49, 0x49, 0x2A, 0x00 }) || d[..4].SequenceEqual(new byte[] { 0x4D, 0x4D, 0x00, 0x2A })))
+            return "image/tiff";
+
+        throw new InvalidOperationException("Invalid image format.");
     }
 }
