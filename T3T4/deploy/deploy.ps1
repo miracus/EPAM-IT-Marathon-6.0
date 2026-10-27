@@ -133,7 +133,14 @@ use_cloudfront = $(if ($CloudFront) { 'true' } else { 'false' })
       if (-not (Test-Bucket $deployBucket)) { Run 'syndicate create-deploy-target-bucket' } else { Ok "artifacts bucket $deployBucket already exists" }
 
       Run 'syndicate build'
-      Run 'syndicate deploy --deploy_name dev --replace_output'   # --replace_output makes re-runs safe
+      # 'deploy' only creates missing resources; existing Lambda/API Gateway are updated by 'update'.
+      $existingApi = Native { aws apigateway get-rest-apis --region $Region --query "items[?name=='restaurant-backend-api'].id | [0]" --output text }
+      if ($existingApi -and $existingApi -ne 'None') {
+        Ok "API $existingApi exists -> updating Lambda code and API Gateway routes"
+        Run 'syndicate update --deploy_name dev --replace_output --force'
+      } else {
+        Run 'syndicate deploy --deploy_name dev --replace_output'
+      }
     } finally { if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }; Pop-Location }
     Ok 'backend deployed'
   }

@@ -178,7 +178,7 @@ try {
   $ownerSessionId = $r.Json.guestSessionId
   Check 'guestSessionId is returned' ([bool]$ownerSessionId)
   $r2 = Invoke-Api GET "/reservations/$reservationId/guest-session-id" $null $ownerToken
-  Check 'second call returns the same session' ($r2.Json.guestSessionId -eq $ownerSessionId) "($($r2.Json.guestSessionId))"
+  Check 'second call returns the same session' ([bool]$ownerSessionId -and $r2.Json.guestSessionId -eq $ownerSessionId) "($($r2.Json.guestSessionId))"
   Expect (Invoke-Api GET "/reservations/$reservationId/guest-session-id" $null $tokens.stranger) 403 'not the owner'
   Expect (Invoke-Api GET "/reservations/00000000-0000-0000-0000-000000000000/guest-session-id" $null $ownerToken) 404 'unknown reservation'
 
@@ -210,12 +210,12 @@ try {
   Expect $r 200 'owner removes Tom Yum from Anna'
   Check 'group total = 79 after removal' ([decimal]$r.Json.total -eq 79) "(got $($r.Json.total))"
   $g = Invoke-Api GET "/guest/sessions/$($anna.sessionId)" $null $anna.sessionToken
-  $notices = @($g.Json.notices)
+  $notices = @($g.Json.notices | Where-Object { $_ })
   Check 'Anna sees 1 notice' ($g.Status -eq 200 -and $notices.Count -eq 1) "(status $($g.Status), notices $($notices.Count))"
   if ($notices.Count -gt 0) { Write-Host "        notice: $($notices[0].message)" -ForegroundColor DarkGray }
   Expect (Invoke-Api POST "/guest/sessions/$($anna.sessionId)/notices/ack" $null $anna.sessionToken) 200 'Anna acknowledges'
   $g = Invoke-Api GET "/guest/sessions/$($anna.sessionId)" $null $anna.sessionToken
-  Check 'notices are cleared' (@($g.Json.notices).Count -eq 0)
+  Check 'notices are cleared' ($g.Status -eq 200 -and @($g.Json.notices | Where-Object { $_ }).Count -eq 0)
   Expect (Invoke-Api POST "/guest/sessions/$($anna.sessionId)/notices/ack" $null 'wrong-token') 401 'ack with a wrong guest token'
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($anna.sessionId)/dishes/$soup" $null $ownerToken) 404 'dish already removed'
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($olena.sessionId)/dishes/$soup" $null $tokens.stranger) 403 'not the owner'
