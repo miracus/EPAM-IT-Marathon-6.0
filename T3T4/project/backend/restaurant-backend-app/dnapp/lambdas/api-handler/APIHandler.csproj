@@ -6,6 +6,8 @@
         <OutputType>Library</OutputType>
         <Nullable>enable</Nullable>
         <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+        <!-- NPOI 2.8+ binary EULA (OSMF): fee applies only to revenue-generating use >= $10k/yr; this is a non-commercial training project. -->
+        <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
     </PropertyGroup>
 
     <ItemGroup>
