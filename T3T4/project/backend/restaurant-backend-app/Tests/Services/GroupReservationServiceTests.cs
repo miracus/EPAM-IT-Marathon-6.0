@@ -47,6 +47,7 @@ public class GroupReservationServiceTests
     {
         groupReservation.ReservationId = reservation.Id;
         groupReservation.Status = GroupReservationStatus.Open;
+        reservation.GuestCount = 5; // AutoFixture may generate 1, which correctly triggers the guest limit
         reservation.TableId = table.Id;
         table.LocationId = location.Id;
 

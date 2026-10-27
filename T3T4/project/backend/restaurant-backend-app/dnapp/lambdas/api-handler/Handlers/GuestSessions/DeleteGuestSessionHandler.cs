@@ -1,6 +1,5 @@
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
-using APIHandler.Exceptions;
 using APIHandler.Helpers;
 using APIHandler.Services.GuestSessions;
 using System;
@@ -8,57 +7,34 @@ using System.Threading.Tasks;
 
 namespace APIHandler.Handlers.GuestSessions;
 
-public class DeleteGuestSessionHandler : IApiRequestHandler
+/// <summary>
+/// DELETE /guest/groups/{groupReservationId}/sessions/{guestSessionId} — homework L3.
+/// Owner removes a participant and gets the updated group snapshot.
+/// </summary>
+public class DeleteGuestSessionHandler(IGroupPreOrderService groupPreOrderService) : IApiRequestHandler
 {
-    private readonly IGuestSessionService _guestSessionService;
-
-    public DeleteGuestSessionHandler(IGuestSessionService guestSessionService)
-    {
-        _guestSessionService = guestSessionService ?? throw new ArgumentNullException(nameof(guestSessionService));
-    }
+    private readonly IGroupPreOrderService _service = groupPreOrderService ?? throw new ArgumentNullException(nameof(groupPreOrderService));
 
     public async Task<APIGatewayProxyResponse> HandleRequest(APIGatewayProxyRequest request, ILambdaContext context)
     {
         if (!request.TryGetPathValue("groupReservationId", out var groupReservationId))
-        {
-            return ResponseBuilder.CreateErrorResponse(400, "Missing 'groupReservationId' in path parameters.", context.Logger);
-        }
+            return GroupPreOrderResponses.MissingPath("groupReservationId", context);
 
         if (!request.TryGetPathValue("guestSessionId", out var guestSessionId))
-        {
-            return ResponseBuilder.CreateErrorResponse(400, "Missing 'guestSessionId' in path parameters.", context.Logger);
-        }
+            return GroupPreOrderResponses.MissingPath("guestSessionId", context);
 
-        if (request.RequestContext?.Authorizer?.Claims == null ||
-            !request.RequestContext.Authorizer.Claims.TryGetValue("sub", out var userId))
-        {
-            return ResponseBuilder.CreateErrorResponse(401, "Unauthorized.", context.Logger);
-        }
+        var userId = UserContextHelper.GetAuthenticatedUserId(request);
+        if (userId is null)
+            return GroupPreOrderResponses.Unauthorized(context);
 
         try
         {
-            var updatedSnapshot = await _guestSessionService.DeleteGuestSessionAsync(userId, groupReservationId, guestSessionId);
-            return ResponseBuilder.CreateSuccessResponse(updatedSnapshot);
+            var snapshot = await _service.DeleteSessionAsync(userId, groupReservationId, guestSessionId);
+            return ResponseBuilder.CreateJsonResponse(200, snapshot);
         }
-        catch (GroupReservationNotFoundException ex)
+        catch (Exception exception) when (GroupPreOrderResponses.TryMap(exception, context, out var response))
         {
-            return ResponseBuilder.CreateErrorResponse(404, ex.Message, context.Logger);
-        }
-        catch (GuestSessionNotFoundException ex)
-        {
-            return ResponseBuilder.CreateErrorResponse(404, ex.Message, context.Logger);
-        }
-        catch (ReservationNotFoundException ex)
-        {
-            return ResponseBuilder.CreateErrorResponse(404, ex.Message, context.Logger);
-        }
-        catch (ActionForbiddenException ex)
-        {
-            return ResponseBuilder.CreateErrorResponse(403, ex.Message, context.Logger);
-        }
-        catch (ValidationException ex)
-        {
-            return ResponseBuilder.CreateErrorCodeResponse(ex);
+            return response;
         }
     }
 }
