@@ -7,3 +7,27 @@ desktop.ini
 # Office temp files
 ~$*
 *.tmp
+
+# Secrets — never commit
+aws.txt
+**/aws.txt
+*.pem
+.env
+**/.aws/
+terraform.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+tfplan
+
+# Deploy / build artefacts
+deploy-log-*.txt
+syndicate_venv/
+**/bin/
+**/obj/
+**/dist/
+**/node_modules/
+**/bundles/
+.syndicate-config-*/logs/
+.syndicate
+_project_export.tgz
