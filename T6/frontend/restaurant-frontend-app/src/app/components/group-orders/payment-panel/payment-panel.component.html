@@ -1,0 +1,53 @@
+<section class="payment" aria-labelledby="payment-title">
+  <h2 id="payment-title" class="title">Choose how to pay</h2>
+  <p class="hint">Demo: payments are simulated, no money is charged.</p>
+
+  <div class="modes" role="radiogroup" aria-label="Payment mode">
+    @for (option of options; track option.mode) {
+      <button
+        type="button"
+        role="radio"
+        class="mode"
+        [class.mode--active]="view().mode === option.mode"
+        [attr.aria-checked]="view().mode === option.mode"
+        [disabled]="busy()"
+        (click)="modeChange.emit(option.mode)"
+      >
+        <span class="mode-title">{{ option.title }}</span>
+        <span class="mode-hint">{{ option.hint }}</span>
+      </button>
+    }
+  </div>
+
+  @if (view().mode) {
+    <ul class="rows">
+      @for (person of view().participants; track person.id) {
+        <li class="row">
+          <span class="name">{{ person.type === 'Owner' ? 'You' : person.name }}</span>
+          <span class="amount">{{ person.amount | currency }}</span>
+          <span class="status" [class.status--paid]="person.isPaid">{{ statusLabel(person) }}</span>
+          @if (!person.isPaid) {
+            <button type="button" class="link" [disabled]="busy()" (click)="markPaid.emit(person)">Mark paid</button>
+          } @else {
+            <span></span>
+          }
+        </li>
+      }
+    </ul>
+
+    <div class="actions">
+      <button type="button" class="button button--secondary button--large" [disabled]="busy() || unpaidGuests() === 0" (click)="sendLinks.emit()">
+        Send payment links
+      </button>
+      @if (unpaidGuests() > 0) {
+        <button type="button" class="button button--tertiary button--large" [disabled]="busy()" (click)="remindUnpaid.emit()">
+          Remind {{ unpaidGuests() }}
+        </button>
+      }
+    </div>
+  }
+
+  <p class="totals">
+    Paid <strong>{{ view().paidTotal | currency }}</strong> · Pending <strong>{{ view().pendingTotal | currency }}</strong>
+  </p>
+</section>

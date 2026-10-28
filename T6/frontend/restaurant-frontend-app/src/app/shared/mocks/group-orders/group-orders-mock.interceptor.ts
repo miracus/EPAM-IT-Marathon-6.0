@@ -15,9 +15,9 @@ const LATENCY_MS = 400;
 export const groupOrdersMockStore = new GroupOrdersMockStore();
 
 /**
- * DEV-ONLY. Перехоплює запити ЛИШЕ для демо-бронювання `demo-reservation` / `demo-group`.
- * Усі інші запити йдуть на справжній API без змін.
- * Відкрий: /reservations/demo-reservation/group-order?demo  (?demo — мок-логін, див. shared/mocks/auth/demo-auth.ts)
+ * DEV-ONLY. Intercepts requests ONLY for the demo reservation `demo-reservation` / `demo-group`.
+ * All other requests go to the real API unchanged.
+ * Open: /reservations/demo-reservation/group-order?demo  (?demo is the mock login, see shared/mocks/auth/demo-auth.ts)
  */
 export const groupOrdersMockInterceptor: HttpInterceptorFn = (req, next) => {
   const path = req.url.split('?')[0];
@@ -61,7 +61,7 @@ export const groupOrdersMockInterceptor: HttpInterceptorFn = (req, next) => {
     return respond(() => store.remove(guestSessionId));
   }
 
-  // Демо-логін (?demo): справжній API демо-токен не прийме, тож кошик у шапці показуємо порожнім.
+  // Demo login (?demo): the real API will not accept the demo token, so the header cart is shown empty.
   if (req.method === 'GET' && path.endsWith('/orders') && isDemoAuthorization(req.headers.get('Authorization'))) {
     return respond(() => []);
   }

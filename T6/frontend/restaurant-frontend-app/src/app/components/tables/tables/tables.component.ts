@@ -30,6 +30,7 @@ import { ReservationDraftChanges } from '@app/components/reservations/edit-reser
 import { LocationResponse } from '@app/models/locations/location-response.model';
 import { Reservation } from '@app/models/reservations/reservation.model';
 import { ActivatedRoute, Router } from '@angular/router';
+import { GroupOrdersService } from '../../../services/group-orders/group-orders.service';
 import { AuthenticationService } from '@app/auth/services/authentication.service';
 import { ToastService } from '@app/services/toast/toast.service';
 
@@ -72,11 +73,19 @@ export class TablesComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly groupOrdersService = inject(GroupOrdersService);
+  /** US21: the reservation this booking repeats ("Book again with same group"). */
+  private rebookFromReservationId: string | null = null;
 
   constructor() {
     this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.selectedLocationId = params['locationId'] ?? undefined;
-      console.log('location id: ' + this.selectedLocationId);
+      // US21: "Book again with same group" — same guest count, and the new group is linked to the old one.
+      const guests = Number(params['guests']);
+      if (Number.isInteger(guests) && guests > 0) {
+        this.selectedFilter.guests = guests;
+      }
+      this.rebookFromReservationId = params['rebookFrom'] ?? null;
     });
 
     this.locationService
@@ -264,11 +273,34 @@ export class TablesComponent implements OnInit {
           this.reservation = reservation;
           this.showReviewModal = false;
           this.showInviteModal = true;
+          this.linkToPreviousGroup(reservation.id);
         },
         error: (error: HttpErrorResponse) => {
           this.isSubmittingReservation = false;
           this.toastService.error(this.buildReservationErrorMessage(error));
         },
+      });
+  }
+
+  /** US21 AC3: everyone from the previous group sees the new invite on their old link. */
+  private linkToPreviousGroup(reservationId: string): void {
+    const previousReservationId = this.rebookFromReservationId;
+    if (!previousReservationId || !reservationId) {
+      return;
+    }
+
+    this.groupOrdersService
+      .rebook$(reservationId, previousReservationId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.rebookFromReservationId = null;
+          this.toastService.success(
+            `${result.invitedParticipants} ${result.invitedParticipants === 1 ? 'person' : 'people'} from your last visit will see the new invite.`,
+            'Booked again with the same group',
+          );
+        },
+        error: () => undefined,
       });
   }
 

@@ -1,6 +1,12 @@
-@if (store.status() === 'submitted') {
+@if (store.removed()) {
+<section class="invite-retry" role="alert">
+    <h1>You were removed from this group order</h1>
+    <p>The organizer removed you from the group pre-order. Contact them if this is a mistake.</p>
+</section>
+} @else if (store.status() === 'submitted') {
+<app-guest-notices (pickAnother)="backToMenu()" />
 <app-guest-preorder-submitted [items]="store.cartItems()" [total]="store.total()" [guestName]="store.guestName()"
-    [invite]="store.invite()" (createNew)="store.createNewPreorder()" />
+    [invite]="store.invite()" [locked]="store.isLocked()" (createNew)="store.createNewPreorder()" (editOrder)="backToMenu()" />
 } @else {
 @if (store.inviteError() === 'retryable') {
 <section class="invite-retry" role="alert">
@@ -21,6 +27,9 @@
         Loading reservation details...
         } @else {
         Reservation details are unavailable
+        }
+        @if (store.cutoffAt() && store.timeLeft(); as left) {
+        · Changes close at {{ store.cutoffAt() | date: 'HH:mm' }} · {{ left }}
         }
     </div>
 
@@ -43,6 +52,8 @@
             <h1 class="hero-title">Menu</h1>
         </div>
     </section>
+
+    <app-guest-notices (pickAnother)="backToMenu()" />
 
     <main class="content-sections">
         @if (store.menuLoading()) {
@@ -96,8 +107,10 @@
 
 <!-- cart drawer -->
 <app-guest-cart-drawer [open]="isCartOpen()" [items]="store.cartItems()" [total]="store.total()"
-    [busy]="store.cartBusy()" [error]="store.cartError()" (closed)="closeCart()"
+    [busy]="store.cartBusy()" [error]="store.cartError()" [locked]="store.isLocked()"
+    [removed]="store.removedNotices()" [allergies]="store.allergies()" (closed)="closeCart()"
     (goToMenu)="closeCart()" (inc)="store.inc($event)" (dec)="store.dec($event)" (remove)="store.remove($event)"
+    (noteChange)="onNoteChange($event)" (serveChange)="onServeChange($event)" (allergiesChange)="onAllergiesChange($event)"
     (submitted)="store.submitPreorder()" />
 }
 }

@@ -245,3 +245,74 @@
     height: 52px;
   }
 }
+
+// ---- US16/US18/US19
+.note {
+    color: color.$neutral-600;
+    font-size: 13px;
+    font-style: italic;
+}
+
+.extras,
+.note-editor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 4px 0;
+    font-size: 13px;
+}
+
+.note-input {
+    flex: 1 1 140px;
+    padding: 6px 10px;
+    border: 1px solid color.$neutral-200;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.counter {
+    color: color.$neutral-400;
+    font-size: 12px;
+}
+
+.link {
+    padding: 0;
+    border: 0;
+    color: color.$green-600;
+    background: none;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+
+    &--muted {
+        color: color.$neutral-600;
+    }
+}
+
+.serve select {
+    margin-left: 4px;
+    border: 1px solid color.$neutral-200;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.item--removed {
+    opacity: 0.7;
+}
+
+.removed-tag {
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 4px;
+    color: color.$red-400;
+    background-color: color.$red-100;
+    font-size: 12px;
+}
+
+.allergies {
+    display: grid;
+    gap: 4px;
+    padding: 12px 24px 0;
+    font-size: 14px;
+}

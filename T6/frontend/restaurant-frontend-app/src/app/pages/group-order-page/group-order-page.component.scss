@@ -348,3 +348,85 @@
     flex: 1 1 auto;
   }
 }
+
+// ---- US20: live indicator
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background-color: color.$green-400;
+
+  &--off {
+    background-color: color.$neutral-400;
+  }
+}
+
+// ---- US13/US14/US20: progress, cut-off, reminders
+.progress-row,
+.cutoff-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.progress {
+  font-weight: 500;
+}
+
+.cutoff {
+  color: color.$neutral-700;
+
+  &--passed {
+    color: color.$red-400;
+  }
+}
+
+.auto-remind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: color.$neutral-600;
+  font-size: 14px;
+}
+
+// ---- US18/US19: By guest / By dish
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background-color: color.$neutral-200;
+  align-self: flex-start;
+}
+
+.view-tab {
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+
+  &--active {
+    background-color: color.$neutral-0;
+    font-weight: 500;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color.$orange-400;
+  }
+}
+
+// ---- US21
+.completed {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background-color: color.$neutral-0;
+  justify-items: start;
+}
