@@ -22,8 +22,10 @@ export const tokenInterceptor: HttpInterceptorFn = (
   // Otherwise we break POST /guest/sessions payload.
   if (req.url.includes('/guest/')) {
     // Owner endpoints of the group pre-order live under /guest/groups/... but are protected by Cognito,
-    // so they need the user's id token. Guest endpoints send their own guest-session token — never override it.
-    const isOwnerGroupEndpoint = req.url.includes('/guest/groups/');
+    // so they need the user's id token. /guest/invites/ is public, but with the id token the backend
+    // recognises the owner (who may open a full or already submitted group).
+    // Guest endpoints send their own guest-session token — never override it.
+    const isOwnerGroupEndpoint = req.url.includes('/guest/groups/') || req.url.includes('/guest/invites/');
     let guestRequest = req;
     if (isOwnerGroupEndpoint && !req.headers.has('Authorization')) {
       const idToken = inject(AuthenticationService).getTokens()?.idToken;

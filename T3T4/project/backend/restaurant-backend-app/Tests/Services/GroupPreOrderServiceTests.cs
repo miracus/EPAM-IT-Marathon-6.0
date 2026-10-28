@@ -493,6 +493,84 @@ public class GroupPreOrderServiceTests
         await Assert.ThrowsAsync<GroupReservationSubmittedException>(() => _service.RemoveGuestDishAsync(OwnerId, GroupId, "anna", _soup.Id));
     }
 
+    // ------------------------------------------------------------------ owner's own pre-order (reservation order)
+
+    [Fact]
+    public async Task GetSessionsAsync_OpenGroup_OwnerCardShowsOwnOrder()
+    {
+        SetupSessions(Owner("owner-session"), Guest("anna", "Anna", submitted: true, (_salad.Id, 1)));
+        SetupOrder(
+            new OrderItem { DishId = _soup.Id, Quantity = 2, State = OrderItemState.Pending },
+            new OrderItem { DishId = _salad.Id, Quantity = 1, State = OrderItemState.Canceled });
+
+        GetAllSessionsResponse result = await _service.GetSessionsAsync(OwnerId, GroupId);
+
+        Participant owner = result.Participants.First();
+        Assert.Equal(ParticipantType.Owner, owner.Type);
+        Assert.True(owner.IsSubmitted);
+        Assert.Equal(_soup.Id, Assert.Single(owner.Items).Dish.Id);
+        Assert.Equal(44m, owner.Total);
+        Assert.Equal(44m + 19m, result.Total);
+    }
+
+    [Fact]
+    public async Task GetSessionsAsync_OpenGroupWithoutOrder_OwnerCardIsEmptyAndNotSubmitted()
+    {
+        SetupSessions(Owner("owner-session"));
+        _orders.Setup(r => r.GetOrderByReservationIdAsync(ReservationId)).ReturnsAsync((Order?)null);
+
+        Participant owner = (await _service.GetSessionsAsync(OwnerId, GroupId)).Participants.Single();
+
+        Assert.Empty(owner.Items);
+        Assert.False(owner.IsSubmitted);
+    }
+
+    [Fact]
+    public async Task GetSessionsAsync_SubmittedGroup_OwnerCardShowsSavedSnapshot()
+    {
+        _group.Status = GroupReservationStatus.Submitted;
+        GuestSession owner = Owner("owner-session", (_soup.Id, 1));
+        owner.IsSubmitted = true;
+        SetupSessions(owner);
+        // After submit the order also contains the guests' dishes — it must not be shown on the owner's card.
+        SetupOrder(new OrderItem { DishId = _salad.Id, Quantity = 5, State = OrderItemState.Pending });
+
+        Participant card = (await _service.GetSessionsAsync(OwnerId, GroupId)).Participants.Single();
+
+        Assert.Equal(_soup.Id, Assert.Single(card.Items).Dish.Id);
+        Assert.True(card.IsSubmitted);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_OnlyOwnerOrder_IsAllowed()
+    {
+        SetupSessions(Owner("owner-session"), Guest("anna", "Anna", submitted: false, (_salad.Id, 1)));
+        Order order = SetupOrder(new OrderItem { DishId = _soup.Id, Quantity = 1, State = OrderItemState.Pending });
+
+        IReadOnlyList<SubmittedDishResponse> result = await _service.SubmitAsync(OwnerId, GroupId, ReservationId);
+
+        Assert.Empty(result);
+        Assert.Equal(OrderStatus.SubmittedByCustomer, order.Status);
+        Assert.Equal(GroupReservationStatus.Submitted, _group.Status);
+        Assert.Equal(_soup.Id, Assert.Single(order.Dishes).DishId);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_SavesOwnerOwnDishesBeforeMergingGuests()
+    {
+        GuestSession owner = Owner("owner-session");
+        SetupSessions(owner, Guest("anna", "Anna", submitted: true, (_salad.Id, 2)));
+        SetupOrder(new OrderItem { DishId = _soup.Id, Quantity = 1, State = OrderItemState.Pending });
+
+        await _service.SubmitAsync(OwnerId, GroupId, ReservationId);
+
+        _sessions.Verify(r => r.SaveAsync(owner), Times.Once);
+        Assert.True(owner.IsSubmitted);
+        OrderItem saved = Assert.Single(owner.Dishes);
+        Assert.Equal(_soup.Id, saved.DishId);
+        Assert.Equal(1, saved.Quantity);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private static Dish MakeDish(string id, string name, decimal price, DishState state = DishState.Available) => new()

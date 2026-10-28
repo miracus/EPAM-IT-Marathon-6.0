@@ -24,12 +24,13 @@ public class GroupReservationService(
 {
     private const string DefaultRestaurantName = "Green & Tasty";
 
-    public async Task<GetGroupReservationResponse> GetGroupReservationByTokenAsync(string token)
+    public async Task<GetGroupReservationResponse> GetGroupReservationByTokenAsync(string token, string? requesterId = null)
     {
         GroupReservation groupReservation = await groupReservationRepository.GetGroupReservationByTokenAsync(token)
             ?? throw new GroupReservationNotFoundException();
 
-        if (groupReservation.Status != GroupReservationStatus.Open)
+        // Anonymous caller (a guest): fail fast without loading the reservation.
+        if (requesterId is null && groupReservation.Status != GroupReservationStatus.Open)
             throw new GroupReservationExpiredException();
 
         Task<Reservation?> reservationTask = reservationRepository.GetReservationByIdAsync(groupReservation.ReservationId);
@@ -38,8 +39,16 @@ public class GroupReservationService(
         Reservation reservation = await reservationTask ?? throw new ValidationException("Associated reservation not found.");
         int joinedGuestsCount = await countTask;
 
-        if (joinedGuestsCount + 1 >= reservation.GuestCount)
-            throw new GuestLimitExceededException();
+        // Guests may join only an open group with free places. The owner always needs the group details
+        // to manage the pre-order, including when the group is full or already submitted.
+        if (!IsOwner(reservation, requesterId))
+        {
+            if (groupReservation.Status != GroupReservationStatus.Open)
+                throw new GroupReservationExpiredException();
+
+            if (joinedGuestsCount + 1 >= reservation.GuestCount)
+                throw new GuestLimitExceededException();
+        }
 
         Table table = await tableRepository.GetTableAsync(reservation.TableId)
             ?? throw new InvalidOperationException("Associated table not found.");
@@ -121,7 +130,7 @@ public class GroupReservationService(
         await groupReservationRepository.SaveGroupReservationAsync(groupReservation);
     }
 
-    public async Task<GetGroupInviteTokenResponse> GetGroupReservationInviteTokenAsync(string reservationId)
+    public async Task<GetGroupInviteTokenResponse> GetGroupReservationInviteTokenAsync(string reservationId, string? requesterId = null)
     {
         var reservation = await reservationRepository.GetReservationByIdAsync(reservationId)
             ?? throw new ReservationNotFoundException($"Reservation {reservationId} was not found.");
@@ -129,10 +138,17 @@ public class GroupReservationService(
         if (reservation.GuestCount < 2)
             throw new ValidationException("Retrieving invitation token for the reservation with only one guest is not permitted.");
 
-        if (reservation.Status != ReservationStatus.Reserved)
+        // The owner opens the group pre-order screen through this token, also after the group was submitted.
+        bool isOwner = IsOwner(reservation, requesterId);
+
+        if (!isOwner && reservation.Status != ReservationStatus.Reserved)
             throw new GroupReservationExpiredException("The group reservation is expired.");
 
-        GroupReservation groupReservation = (await groupReservationRepository.GetByReservationIdAsync(reservationId))!;
+        GroupReservation groupReservation = await groupReservationRepository.GetByReservationIdAsync(reservationId)
+            ?? throw new GroupReservationNotFoundException();
+
+        if (isOwner)
+            return new GetGroupInviteTokenResponse(groupReservation.ReservationToken);
 
         if (groupReservation.Status == GroupReservationStatus.Submitted)
             throw new GroupReservationSubmittedException();
@@ -142,5 +158,9 @@ public class GroupReservationService(
 
         return new GetGroupInviteTokenResponse(groupReservation.ReservationToken);
     }
+
+    private static bool IsOwner(Reservation reservation, string? requesterId) =>
+        !string.IsNullOrWhiteSpace(requesterId)
+        && string.Equals(reservation.CustomerId, requesterId, StringComparison.OrdinalIgnoreCase);
 }
 

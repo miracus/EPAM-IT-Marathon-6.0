@@ -85,6 +85,27 @@ describe('tokenInterceptor', () => {
       req.flush({ participants: [], total: 0 });
     });
 
+    it('adds the id token to /guest/invites/ so the backend can recognise the owner', () => {
+      authService.getTokens.and.returnValue({ idToken: 'id-token', accessToken: 'access-token' });
+      const url = 'https://test.api/guest/invites/tok-1';
+
+      http.get(url).subscribe();
+
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.get('Authorization')).toBe('Bearer id-token');
+      req.flush({});
+    });
+
+    it('sends /guest/invites/ without a token for anonymous guests', () => {
+      const url = 'https://test.api/guest/invites/tok-1';
+
+      http.get(url).subscribe();
+
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.has('Authorization')).toBeFalse();
+      req.flush({});
+    });
+
     it('does not add a token to other guest endpoints', () => {
       authService.getTokens.and.returnValue({ idToken: 'id-token', accessToken: 'access-token' });
       const url = 'https://test.api/guest/sessions/gs-1/menu';
