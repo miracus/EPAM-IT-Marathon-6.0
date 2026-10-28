@@ -54,3 +54,14 @@
   grid-column: 1;
   grid-row: 1;
 }
+
+// Без заголовка повідомлення стоїть в одному рядку зі значком, а не під ним.
+.toast-content--no-title {
+  .toast-message {
+    grid-row: 1;
+  }
+}
+
+:host:has(.toast-content--no-title) {
+  align-items: center;
+}
