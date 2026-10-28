@@ -89,9 +89,14 @@ public class GroupPreOrderService(
         EnsureGroupIsOpen(group);
 
         List<GuestSession> sessions = await guestSessionRepository.GetAllByGroupReservationIdAsync(group.GroupReservationId);
-        List<GuestSession> submittedSessions = sessions.Where(s => s.IsSubmitted).ToList();
 
-        if (submittedSessions.Count == 0)
+        // The owner's own pre-order lives in the reservation order (POST /orders), not in the owner guest session.
+        Order? order = await orderRepository.GetOrderByReservationIdAsync(reservationId);
+        List<OrderItem> ownerItems = OwnerOrderItems(order) ?? [];
+
+        List<GuestSession> submittedSessions = sessions.Where(s => s.IsSubmitted && !s.IsOwnerSession).ToList();
+
+        if (submittedSessions.Count == 0 && ownerItems.Count == 0)
             throw new ValidationException("There are no submitted guest sessions in this group reservation.");
 
         List<OrderItem> submittedItems = submittedSessions
@@ -99,15 +104,17 @@ public class GroupPreOrderService(
             .Where(d => d.Quantity > 0)
             .ToList();
 
-        if (submittedItems.Count == 0)
+        if (submittedItems.Count == 0 && ownerItems.Count == 0)
             throw new ValidationException("Submitted guest sessions do not contain any dishes.");
 
         // Dishes that went On Stop / Out of stock after guests chose them are not sent to the restaurant (US12 AC6, US13 AC5).
         string[] dishIds = submittedItems.Select(i => i.DishId).Distinct().ToArray();
-        HashSet<string> availableDishIds = (await dishRepository.GetDishesByIdsAsync(dishIds))
-            .Where(d => d.State == DishState.Available)
-            .Select(d => d.Id)
-            .ToHashSet();
+        HashSet<string> availableDishIds = dishIds.Length == 0
+            ? new HashSet<string>()
+            : (await dishRepository.GetDishesByIdsAsync(dishIds))
+                .Where(d => d.State == DishState.Available)
+                .Select(d => d.Id)
+                .ToHashSet();
 
         List<SubmittedDishResponse> merged = submittedItems
             .Where(i => availableDishIds.Contains(i.DishId))
@@ -115,14 +122,17 @@ public class GroupPreOrderService(
             .Select(g => new SubmittedDishResponse(g.Key, g.Sum(i => i.Quantity)))
             .ToList();
 
-        if (merged.Count == 0)
+        if (merged.Count == 0 && ownerItems.Count == 0)
             throw new ValidationException("None of the dishes in submitted guest sessions are available.");
 
-        Order order = await orderRepository.GetOrderByReservationIdAsync(reservationId)
-            ?? throw new ValidationException($"Order for reservation {reservationId} was not found.");
+        if (order is null)
+            throw new ValidationException($"Order for reservation {reservationId} was not found.");
 
         if (order.Status == OrderStatus.Cancelled)
             throw new ValidationException($"Order for reservation {reservationId} was cancelled.");
+
+        // After the merge the order also holds the guests' dishes, so keep the owner's own part in the owner session.
+        await SaveOwnerSnapshotAsync(sessions, group, userId, ownerItems);
 
         order.Dishes ??= [];
         foreach (SubmittedDishResponse line in merged)
@@ -264,8 +274,20 @@ public class GroupPreOrderService(
             .OrderByDescending(s => s.IsOwnerSession)
             .ToList();
 
+        // While the group is open, the owner's dishes come from the live reservation order.
+        // After submit they come from the snapshot saved in the owner session (the order then includes the guests' dishes).
+        List<OrderItem>? ownerOrderItems = group.Status == GroupReservationStatus.Open && ordered.Any(s => s.IsOwnerSession)
+            ? OwnerOrderItems(await orderRepository.GetOrderByReservationIdAsync(reservation.Id))
+            : null;
+
+        List<OrderItem> ItemsOf(GuestSession session) =>
+            session.IsOwnerSession && ownerOrderItems is not null ? ownerOrderItems : session.Dishes ?? [];
+
+        bool IsSubmitted(GuestSession session) =>
+            session.IsOwnerSession && ownerOrderItems is not null ? ownerOrderItems.Count > 0 : session.IsSubmitted;
+
         string[] dishIds = ordered
-            .SelectMany(s => s.Dishes ?? [])
+            .SelectMany(ItemsOf)
             .Select(d => d.DishId)
             .Distinct()
             .ToArray();
@@ -287,7 +309,7 @@ public class GroupPreOrderService(
         foreach (GuestSession session in ordered)
         {
             // Dishes deleted from the menu are skipped instead of failing the whole snapshot.
-            List<(OrderItem Item, Dish Dish)> lines = (session.Dishes ?? [])
+            List<(OrderItem Item, Dish Dish)> lines = ItemsOf(session)
                 .Where(d => d.Quantity > 0 && dishesById.ContainsKey(d.DishId))
                 .Select(d => (d, dishesById[d.DishId]))
                 .ToList();
@@ -306,11 +328,11 @@ public class GroupPreOrderService(
                 session.IsOwnerSession ? ownerName ?? session.GuestName : session.GuestName,
                 items,
                 total,
-                session.IsSubmitted));
+                IsSubmitted(session)));
         }
 
         List<DishSummary> summary = ordered
-            .SelectMany(s => s.Dishes ?? [])
+            .SelectMany(ItemsOf)
             .Where(d => d.Quantity > 0 && dishesById.ContainsKey(d.DishId))
             .GroupBy(d => d.DishId)
             .Select(g =>
@@ -330,6 +352,38 @@ public class GroupPreOrderService(
             HasUnavailableDishes = summary.Any(s => !s.IsAvailable),
             GroupStatus = group.Status.ToString(),
         };
+    }
+
+    /// <summary>Owner's own pre-order lines, or null when there is no active order.</summary>
+    private static List<OrderItem>? OwnerOrderItems(Order? order)
+    {
+        if (order is null || order.Status == OrderStatus.Cancelled)
+            return null;
+
+        return (order.Dishes ?? [])
+            .Where(d => d.Quantity > 0 && d.State != OrderItemState.Canceled)
+            .Select(d => new OrderItem { DishId = d.DishId, Quantity = d.Quantity, State = d.State })
+            .ToList();
+    }
+
+    private async Task SaveOwnerSnapshotAsync(
+        IReadOnlyCollection<GuestSession> sessions, GroupReservation group, string userId, List<OrderItem> ownerItems)
+    {
+        GuestSession ownerSession = sessions.FirstOrDefault(s => s.IsOwnerSession && s.OwnerUserId == userId)
+            ?? sessions.FirstOrDefault(s => s.IsOwnerSession)
+            ?? new GuestSession
+            {
+                Id = Guid.NewGuid().ToString(),
+                GroupReservationId = group.GroupReservationId,
+                GuestName = OwnerFallbackName,
+                Dishes = [],
+                IsOwnerSession = true,
+                OwnerUserId = userId,
+            };
+
+        ownerSession.Dishes = ownerItems;
+        ownerSession.IsSubmitted = ownerItems.Count > 0;
+        await guestSessionRepository.SaveAsync(ownerSession);
     }
 
     private async Task<string> GetOwnerDisplayNameAsync(string? customerId)

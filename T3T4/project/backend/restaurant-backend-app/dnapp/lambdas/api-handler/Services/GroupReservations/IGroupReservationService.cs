@@ -12,8 +12,10 @@ public interface IGroupReservationService
     Task<GroupReservation> CreateGroupReservationAsync(string reservationId);
     Task UpdateGroupReservationStatusAsync(string groupReservationId, GroupReservationStatus status);
     Task DeleteGroupReservationAsync(string groupReservationId);
-    Task<GetGroupReservationResponse> GetGroupReservationByTokenAsync(string token);
+    /// <param name="requesterId">Cognito id of the caller, if any. The reservation owner skips the guest-only checks.</param>
+    Task<GetGroupReservationResponse> GetGroupReservationByTokenAsync(string token, string? requesterId = null);
     Task CreateGroupReservationIfDoesNotExistAsync(string userId, string reservationId);
     Task CloseGroupReservationAsync(string reservationId);
-    Task<GetGroupInviteTokenResponse> GetGroupReservationInviteTokenAsync(string reservationId);
+    /// <param name="requesterId">Cognito id of the caller. The reservation owner gets the token even after the group was submitted.</param>
+    Task<GetGroupInviteTokenResponse> GetGroupReservationInviteTokenAsync(string reservationId, string? requesterId = null);
 }

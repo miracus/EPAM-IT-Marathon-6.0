@@ -132,6 +132,48 @@
   }
 }
 
+// ---- invite link
+.invite {
+  padding: 16px;
+  border-radius: 12px;
+  background-color: color.$neutral-0;
+}
+
+.invite-title {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.invite-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+
+.invite-input {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid color.$neutral-200;
+  border-radius: 8px;
+  color: color.$neutral-700;
+  background-color: color.$neutral-100;
+  font: inherit;
+
+  &:focus-visible {
+    outline: 2px solid color.$orange-400;
+    outline-offset: 1px;
+  }
+}
+
+.invite-hint {
+  margin-top: 6px;
+  color: color.$neutral-600;
+  font-size: 13px;
+}
+
 // ---- participants
 .participants {
   display: flex;

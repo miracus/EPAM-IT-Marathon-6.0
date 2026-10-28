@@ -16,7 +16,9 @@ public class GetGroupReservationHandler(IGroupReservationService groupReservatio
 
         try
         {
-            var result = await groupReservationService.GetGroupReservationByTokenAsync(token);
+            // Public route: the owner is recognised by a valid Cognito id token, guests send none.
+            string? requesterId = await OptionalCognitoUser.GetUserIdAsync(request);
+            var result = await groupReservationService.GetGroupReservationByTokenAsync(token, requesterId);
             return ResponseBuilder.CreateSuccessResponse(result);
         }
         catch(GroupReservationNotFoundException exception)

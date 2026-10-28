@@ -154,9 +154,8 @@ export class CardReservationComponent {
     const startTime = new Date(reservation.startTime);
     const endTime = new Date(reservation.endTime);
 
-    const tableLabel =
-      reservation.tableName ||
-      `Table ${reservation.tableId}`;
+    // "Table N" from the API; never fall back to the table GUID
+    const tableLabel = reservation.tableName;
 
     const queryParams: Params = {
       preOrder: 'true',
@@ -166,7 +165,9 @@ export class CardReservationComponent {
         tableLabel,
         startTime.toDateString(),
         `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
-      ].join(', '),
+      ]
+        .filter(Boolean)
+        .join(', '),
     };
 
     void this.router.navigate(['/menu'], {

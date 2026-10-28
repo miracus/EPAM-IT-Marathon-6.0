@@ -5,19 +5,31 @@
 .EXAMPLE
   .\deploy.ps1 -Email you@example.com
   .\deploy.ps1 -Email you@example.com -Only frontend     # redeploy just one stage
+  .\deploy.ps1 -Email you@example.com -CloudFront        # serve the site through CloudFront (HTTPS)
+
+  The frontend is built from T6\frontend (homework #6, the newest version) when it exists,
+  otherwise from T3T4\project\frontend. Override with -FrontendPath.
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Email,
   [ValidateSet('all', 'infra', 'backend', 'frontend')][string]$Only = 'all',
   [string]$Region = 'eu-north-1',   # new AWS 'Projects' accounts are locked to the project's region
-  [switch]$CloudFront                # use only after AWS Support has verified the account for CloudFront
+  [switch]$CloudFront,               # use only after AWS Support has verified the account for CloudFront
+  [string]$FrontendPath = ''         # Angular app folder; default: T6 if present, else T3T4/project/frontend
 )
 
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\project')).Path
 $Infra    = Join-Path $ProjectRoot 'infra\terraform'
 $Backend  = Join-Path $ProjectRoot 'backend\restaurant-backend-app'
-$Frontend = Join-Path $ProjectRoot 'frontend\restaurant-frontend-app'
+$T6Frontend = Join-Path $PSScriptRoot '..\..\T6\frontend\restaurant-frontend-app'
+if ($FrontendPath) {
+  $Frontend = (Resolve-Path $FrontendPath).Path
+} elseif (Test-Path (Join-Path $T6Frontend 'package.json')) {
+  $Frontend = (Resolve-Path $T6Frontend).Path
+} else {
+  $Frontend = Join-Path $ProjectRoot 'frontend\restaurant-frontend-app'
+}
 $SdctConf = Join-Path $Backend '.syndicate-config-restaurant-backend-app'
 
 $LogFile = Join-Path $PSScriptRoot ("deploy-log-{0:yyyyMMdd-HHmmss}.txt" -f (Get-Date))
@@ -152,10 +164,21 @@ use_cloudfront = $(if ($CloudFront) { 'true' } else { 'false' })
     if (-not $ApiId -or $ApiId -eq 'None') { throw 'API Gateway restaurant-backend-api not found - deploy the backend first.' }
     $env:BACKEND_URL = "https://$ApiId.execute-api.$Region.amazonaws.com/develop"
     Ok "BACKEND_URL = $env:BACKEND_URL"
+    Ok "frontend source: $Frontend"
 
     Push-Location $Frontend
     try {
-      Run 'npm ci --no-audit --no-fund'
+      # Reinstall only when package-lock.json changed: a running `npm start` (or a leftover esbuild.exe)
+      # locks node_modules on Windows and makes `npm ci` fail with EPERM.
+      $lockHash = (Get-FileHash 'package-lock.json' -Algorithm SHA256).Hash
+      $marker = Join-Path 'node_modules' '.deploy-lock-hash'
+      if ((Test-Path $marker) -and ((Get-Content $marker -Raw).Trim() -eq $lockHash)) {
+        Ok 'node_modules are up to date (package-lock.json unchanged) - skipping npm ci'
+      } else {
+        Get-Process esbuild -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Run 'npm ci --no-audit --no-fund'
+        Set-Content -Path $marker -Value $lockHash -Encoding ascii
+      }
       Run 'npm run build'
       Run "aws s3 sync dist/restaurant-frontend-app/browser s3://$FrontendBucket/ --delete"
     } finally { Pop-Location }

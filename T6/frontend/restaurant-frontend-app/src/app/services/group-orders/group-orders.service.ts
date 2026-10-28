@@ -9,6 +9,7 @@ import { GroupStatusResponse } from '@app/models/group-orders/group-status.model
 import { OwnerSessionResponse } from '@app/models/group-orders/owner-session.model';
 import { SubmitGroupPreOrderRequest, SubmittedDish } from '@app/models/group-orders/submit-group-pre-order.model';
 import { GroupRequestOptions } from '@app/models/group-orders/group-request-options.model';
+import { GroupInvite } from '@app/models/group-orders/group-invite.model';
 
 /** HTTP calls of the Owner group pre-order screen (contract: homework-backend.md). */
 @Injectable({ providedIn: 'root' })
@@ -16,13 +17,15 @@ export class GroupOrdersService {
   private readonly baseUrl = inject(API_BASE_URL);
   private readonly http = inject(HttpClient);
 
-  /** reservationId → invite-token → invite data (GroupReservationId, address, time, MaxGuestCount). */
-  getGroupInvite$(reservationId: string): Observable<GuestInvite> {
+  /** reservationId → invite-token → invite data (GroupReservationId, address, time, MaxGuestCount) + the token. */
+  getGroupInvite$(reservationId: string): Observable<GroupInvite> {
     return this.http
       .get<GroupInviteToken>(`${this.baseUrl}/reservations/${encodeURIComponent(reservationId)}/invite-token`)
       .pipe(
         switchMap(({ token }) =>
-          this.http.get<GuestInvite>(`${this.baseUrl}/guest/invites/${encodeURIComponent(token)}`),
+          this.http
+            .get<GuestInvite>(`${this.baseUrl}/guest/invites/${encodeURIComponent(token)}`)
+            .pipe(map((invite) => ({ ...invite, inviteToken: token }))),
         ),
       );
   }

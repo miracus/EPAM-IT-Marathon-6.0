@@ -67,6 +67,25 @@
             <button type="button" class="sync-button" [disabled]="refreshing()" (click)="refresh()">Refresh</button>
           </div>
 
+          @if (inviteLink(); as link) {
+            <section class="invite" aria-labelledby="invite-title">
+              <h2 id="invite-title" class="invite-title">Invite guests</h2>
+              <div class="invite-row">
+                <input
+                  id="invite-link"
+                  class="invite-input"
+                  type="text"
+                  readonly
+                  aria-labelledby="invite-title"
+                  [value]="link"
+                  (focus)="$any($event.target).select()"
+                />
+                <button type="button" class="button button--secondary button--large" (click)="copyInviteLink()">Copy link</button>
+              </div>
+              <p class="invite-hint">Guests open this link, enter their name and choose dishes.</p>
+            </section>
+          }
+
           @if (pendingCount() > 0) {
             <p class="banner" role="note">
               <img src="assets/svg/bell-regular.svg" alt="" aria-hidden="true" width="20" height="20" />

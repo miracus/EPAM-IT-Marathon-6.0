@@ -102,7 +102,9 @@ describe('Integration with our backend (.NET API formats)', () => {
     const tokenReq = http.expectOne(`${API}/reservations/${RES}/invite-token`);
     expect(tokenReq.request.headers.get('Authorization')).toBe('Bearer cognito-id-token');
     tokenReq.flush({ token: 'tok-1' });
-    http.expectOne(`${API}/guest/invites/tok-1`).flush(INVITE_BODY);
+    const inviteReq = http.expectOne(`${API}/guest/invites/tok-1`);
+    expect(inviteReq.request.headers.get('Authorization')).toBe('Bearer cognito-id-token');
+    inviteReq.flush(INVITE_BODY);
     http.expectOne(`${API}/reservations/${RES}/guest-session-id`).flush({ guestSessionId: 'gs-owner' });
 
     const sessionsReq = http.expectOne(`${API}/guest/groups/${GROUP}/sessions`);
