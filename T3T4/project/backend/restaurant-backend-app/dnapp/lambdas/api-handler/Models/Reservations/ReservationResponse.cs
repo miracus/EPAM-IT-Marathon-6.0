@@ -30,6 +30,10 @@ public class ReservationResponse
     [JsonPropertyName("waiterId")]
     public required string WaiterId { get; set; }
 
+    // Human-readable table label, e.g. "Table 1" (the UI must not show the table GUID)
+    [JsonPropertyName("tableName")]
+    public string? TableName { get; set; }
+
     [JsonPropertyName("locationAddress")]
     public required string Address { get; set; }
 

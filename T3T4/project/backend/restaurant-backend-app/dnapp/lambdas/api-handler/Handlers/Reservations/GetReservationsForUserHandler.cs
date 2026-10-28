@@ -10,6 +10,7 @@ using APIHandler.Models.Users;
 using APIHandler.Repositories.GroupReservations;
 using APIHandler.Repositories.GuestSessions;
 using APIHandler.Repositories.Reservations;
+using APIHandler.Repositories.Tables;
 using APIHandler.Services.GroupReservations;
 using APIHandler.Services.Locations;
 using APIHandler.Services.Orders;
@@ -29,17 +30,20 @@ public class GetReservationsForUserHandler : IApiRequestHandler
     private readonly ILocationService _locationService;
     private readonly IOrderService _orderService;
     private readonly IGroupReservationRepository _groupReservationRepository;
+    private readonly ITableRepository _tableRepository;
 
     public GetReservationsForUserHandler(
         IReservationRepository reservationRepository,
         ILocationService locationService,
         IOrderService orderService,
-        IGroupReservationRepository groupReservationRepository)
+        IGroupReservationRepository groupReservationRepository,
+        ITableRepository tableRepository)
     {
         _reservationRepository = reservationRepository ?? throw new ArgumentNullException(nameof(reservationRepository));
         _locationService = locationService ?? throw new ArgumentNullException(nameof(locationService));
         _orderService = orderService ?? throw new ArgumentNullException(nameof(orderService));
         _groupReservationRepository = groupReservationRepository ?? throw new ArgumentNullException(nameof(groupReservationRepository));
+        _tableRepository = tableRepository ?? throw new ArgumentNullException(nameof(tableRepository));
     }
 
     public async Task<APIGatewayProxyResponse> HandleRequest(APIGatewayProxyRequest request, ILambdaContext context)
@@ -142,7 +146,11 @@ public class GetReservationsForUserHandler : IApiRequestHandler
                     guestInviteLinkAvailable = groupReservation.Status == GroupReservationStatus.Open;
             }
 
-            return ReservationMapper.ToReservationResponse(reservation, location.Address, reservationOrder, guestInviteLinkAvailable: guestInviteLinkAvailable);
+            var response = ReservationMapper.ToReservationResponse(reservation, location.Address, reservationOrder, guestInviteLinkAvailable: guestInviteLinkAvailable);
+            var table = await _tableRepository.GetTableByIdAsync(reservation.TableId);
+            if (table is not null)
+                response.TableName = $"Table {table.TableNumber}";
+            return response;
         }
         catch (Exception ex)
         {
