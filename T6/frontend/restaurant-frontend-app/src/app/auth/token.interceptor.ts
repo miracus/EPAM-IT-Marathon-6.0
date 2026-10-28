@@ -21,9 +21,24 @@ export const tokenInterceptor: HttpInterceptorFn = (
   // Guest flow uses a different token (guest session token) and we must not touch the body.
   // Otherwise we break POST /guest/sessions payload.
   if (req.url.includes('/guest/')) {
-    return next(req).pipe(
+    // Owner endpoints of the group pre-order live under /guest/groups/... but are protected by Cognito,
+    // so they need the user's id token. Guest endpoints send their own guest-session token — never override it.
+    const isOwnerGroupEndpoint = req.url.includes('/guest/groups/');
+    let guestRequest = req;
+    if (isOwnerGroupEndpoint && !req.headers.has('Authorization')) {
+      const idToken = inject(AuthenticationService).getTokens()?.idToken;
+      if (idToken) {
+        guestRequest = req.clone({ setHeaders: { Authorization: 'Bearer ' + idToken } });
+      }
+    }
+
+    return next(guestRequest).pipe(
       catchError((error: HttpErrorResponse) => {
         console.log(error);
+
+        if (guestRequest.context.get(SKIP_ERROR_TOAST)) {
+          return throwError(() => error);
+        }
 
         let errorMessage = 'An unexpected error occurred.';
         if (error.error && typeof error.error === 'string') {
@@ -40,7 +55,10 @@ export const tokenInterceptor: HttpInterceptorFn = (
             toastr.error(errorMessage || 'Bad request.', 'Error');
             break;
           case 401:
-            toastr.error('Session expired. Please re-open the invite link.', 'Unauthorized');
+            toastr.error(
+              isOwnerGroupEndpoint ? 'Please log in to perform the action!' : 'Session expired. Please re-open the invite link.',
+              'Unauthorized',
+            );
             break;
           case 403:
             toastr.error(errorMessage || 'You are not allowed!', 'Forbidden');
