@@ -1,0 +1,210 @@
+@use 'app/shared/styles/abstracts/colors' as color;
+
+:host {
+  display: block;
+}
+
+.card {
+  padding: 16px;
+  border-radius: 12px;
+  background-color: color.$neutral-0;
+}
+
+.card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+// Статус кошика: текст + точка, не лише колір.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 24px;
+  white-space: nowrap;
+
+  &.submitted {
+    color: color.$green-800;
+    background-color: color.$green-100;
+  }
+
+  &.pending {
+    color: color.$neutral-700;
+    background-color: color.$orange-100;
+  }
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+
+  .submitted & {
+    background-color: color.$green-400;
+  }
+
+  .pending & {
+    background-color: color.$orange-600;
+  }
+}
+
+.remove {
+  padding: 0 0 4px;
+  border: 0;
+  border-bottom: 1px solid color.$neutral-900;
+  background: none;
+
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  cursor: pointer;
+
+  &:hover {
+    color: color.$red-400;
+    border-bottom-color: color.$red-400;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color.$orange-400;
+    outline-offset: 2px;
+  }
+}
+
+.items {
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto minmax(64px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+
+  & + & {
+    border-top: 1px solid color.$neutral-100;
+  }
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  color: color.$neutral-600;
+  background-color: color.$green-100;
+  font-size: 16px;
+}
+
+.name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.qty {
+  color: color.$neutral-600;
+  white-space: nowrap;
+}
+
+.price {
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 12px;
+  color: color.$neutral-400;
+}
+
+.subtotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+  padding: 16px 12px 4px;
+  border-top: 2px solid color.$neutral-100;
+
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 12px;
+  }
+
+  // Телефон: фото | назва ; під назвою — кількість і ціна.
+  .item {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'avatar name name'
+      'avatar qty price';
+    gap: 2px 12px;
+    padding: 8px 4px;
+  }
+
+  .avatar {
+    grid-area: avatar;
+    width: 40px;
+    height: 40px;
+  }
+
+  .name {
+    grid-area: name;
+  }
+
+  .qty {
+    grid-area: qty;
+  }
+
+  .price {
+    grid-area: price;
+  }
+
+  .subtotal {
+    padding: 12px 4px 4px;
+    font-size: 16px;
+  }
+}
