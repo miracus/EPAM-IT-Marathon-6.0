@@ -34,7 +34,7 @@
   overflow-wrap: anywhere;
 }
 
-// Статус кошика: текст + точка, не лише колір.
+// Cart status: text + dot, not colour alone.
 .chip {
   display: inline-flex;
   align-items: center;
@@ -175,7 +175,7 @@
     padding: 12px;
   }
 
-  // Телефон: фото | назва ; під назвою — кількість і ціна.
+  // Phone: photo | name; quantity and price under the name.
   .item {
     grid-template-columns: 40px minmax(0, 1fr) auto;
     grid-template-areas:

@@ -2,10 +2,10 @@ import { GroupReservationStatus } from '@app/models/group-orders/group-status.mo
 import { Participant } from '@app/models/group-orders/participant.model';
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
 
-/** Стан першого завантаження екрана. */
+/** State of the initial screen load. */
 export type LoadState = 'loading' | 'ready' | 'not-found' | 'error';
 
-/** Усе, що потрібно екрану після першого завантаження. */
+/** Everything the screen needs after the initial load. */
 export interface GroupOrderSnapshot {
   invite: GuestInvite;
   ownerSessionId: string;
@@ -13,7 +13,7 @@ export interface GroupOrderSnapshot {
   status: GroupReservationStatus;
 }
 
-/** Результат фонової синхронізації. */
+/** Result of a background sync. */
 export interface GroupOrderSync {
   participants: Participant[];
   status: GroupReservationStatus;

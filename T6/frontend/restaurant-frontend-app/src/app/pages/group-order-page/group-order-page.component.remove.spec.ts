@@ -1,4 +1,4 @@
-// Бонус · Remove Guest — сторінка. Запуск: npm run test:hw
+// Bonus · Remove Guest — page. Run: npm run test:hw
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';

@@ -19,7 +19,7 @@ function render(data: ToastData): HTMLElement {
 describe('ToastComponent', () => {
   afterEach(() => document.querySelectorAll('app-toast').forEach((node) => node.remove()));
 
-  it('без заголовка: значок і текст в одному рядку', () => {
+  it('without a title: icon and text on one line', () => {
     const element = render({ message: 'Pre-order sent to the restaurant', type: 'success' });
     const icon = element.querySelector('.toast-icon')!.getBoundingClientRect();
     const message = element.querySelector('.toast-message')!.getBoundingClientRect();
@@ -28,7 +28,7 @@ describe('ToastComponent', () => {
     expect(message.left).toBeGreaterThan(icon.right);
   });
 
-  it('із заголовком: текст під заголовком', () => {
+  it('with a title: text below the title', () => {
     const element = render({ title: 'Error', message: 'Something went wrong', type: 'error' });
     const title = element.querySelector('.toast-title')!.getBoundingClientRect();
     const message = element.querySelector('.toast-message')!.getBoundingClientRect();

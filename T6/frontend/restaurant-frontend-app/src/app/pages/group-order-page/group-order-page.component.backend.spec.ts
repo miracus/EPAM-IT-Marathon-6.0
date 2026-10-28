@@ -1,6 +1,6 @@
-// Інтеграція з НАШИМ бекендом (.NET, T3T4): справжні GroupOrdersService + tokenInterceptor,
-// відповіді — точно у форматі, який віддає API Gateway (PascalCase у /guest/invites, camelCase у решті,
-// помилки { error } / { message, errorCode }). У мережу тест не ходить — HttpTestingController.
+// Integration with OUR backend (.NET, T3T4): real GroupOrdersService + tokenInterceptor,
+// responses exactly as API Gateway returns them (PascalCase in /guest/invites, camelCase elsewhere,
+// errors { error } / { message, errorCode }). No network — HttpTestingController.
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -15,7 +15,7 @@ const API = 'https://api.test';
 const RES = '0526c09c-c42c-407c-a994-86ee3a6c88c9';
 const GROUP = '53a1f356-704e-46aa-9b38-89e5ad721297';
 
-/** GET /guest/invites/{token} — CreateSuccessResponse без naming policy → PascalCase, DateTime без «Z». */
+/** GET /guest/invites/{token} — CreateSuccessResponse without a naming policy → PascalCase, DateTime without "Z". */
 const INVITE_BODY = {
   GroupReservationId: GROUP,
   LocationId: 'loc-1',
@@ -35,11 +35,11 @@ const dish = (id: string, name: string, price: number) => ({
 const SALAD = dish('d-salad', 'Spring Salad', 19);
 const SOUP = dish('d-soup', 'Tom Yum', 22);
 
-/** GET /guest/groups/{id}/sessions — CreateJsonResponse (camelCase) + наші розширення US12. */
+/** GET /guest/groups/{id}/sessions — CreateJsonResponse (camelCase) + our US12 extensions. */
 function sessionsBody(annaSubmitted = true) {
   return {
     participants: [
-      // owner-сесію бекенд створює порожньою й непідтвердженою
+      // the backend creates the owner session empty and not submitted
       { id: 'gs-owner', type: 'Owner', name: 'Oleh', items: [], total: 0, isSubmitted: false },
       { id: 'gs-anna', type: 'Guest', name: 'Anna', items: [{ dish: SALAD, quantity: 2 }, { dish: SOUP, quantity: 1 }], total: 60, isSubmitted: annaSubmitted },
       { id: 'gs-olena', type: 'Guest', name: 'Olena', items: [{ dish: SOUP, quantity: 1 }], total: 22, isSubmitted: false },
@@ -51,7 +51,7 @@ function sessionsBody(annaSubmitted = true) {
   };
 }
 
-describe('Інтеграція з нашим бекендом (формати .NET API)', () => {
+describe('Integration with our backend (.NET API formats)', () => {
   let http: HttpTestingController;
   let toast: jasmine.SpyObj<ToastService>;
   let element: HTMLElement;
@@ -98,7 +98,7 @@ describe('Інтеграція з нашим бекендом (формати .N
     http.verify();
   });
 
-  it('endpoint-и Owner (Cognito) отримують id token, публічне запрошення — теж не ламається', () => {
+  it('owner endpoints (Cognito) get the id token; the public invite still works', () => {
     const tokenReq = http.expectOne(`${API}/reservations/${RES}/invite-token`);
     expect(tokenReq.request.headers.get('Authorization')).toBe('Bearer cognito-id-token');
     tokenReq.flush({ token: 'tok-1' });
@@ -111,7 +111,7 @@ describe('Інтеграція з нашим бекендом (формати .N
     http.expectOne(`${API}/guest/groups/${GROUP}/status`).flush({ currentParticipants: 3, maxCapacity: 4, status: 'Open' });
   });
 
-  it('рендерить відповідь бекенду: шапка з PascalCase, My Pre-Order, суми лише з підтверджених кошиків', () => {
+  it('renders the backend response: PascalCase header, My Pre-Order, totals from submitted carts only', () => {
     flushInitialLoad();
     const text = element.textContent ?? '';
 
@@ -121,16 +121,16 @@ describe('Інтеграція з нашим бекендом (формати .N
     expect(element.querySelectorAll('app-participant-card').length).toBe(3);
     expect(text).toContain('My Pre-Order');
     expect(text).toContain('Guest: Anna');
-    // підтверджена лише Anna: 2 × 19 + 22 = 60, а не 82 з API
+    // only Anna submitted: 2 × 19 + 22 = 60, not 82 from the API
     expect(text).toContain('$60.00');
     expect(text).not.toContain('$82.00');
-    // owner-сесія і Olena не підтверджені
+    // the owner session and Olena are not submitted
     expect(text).toMatch(/2 participants haven.t submitted/);
-    // imageUrl: null → перша літера замість фото
+    // imageUrl: null → first letter instead of a photo
     expect(element.querySelector('app-participant-card .initial')?.textContent?.trim()).toBe('S');
   });
 
-  it('submit: POST з { reservationId }, після 200 — Sent to Restaurant', () => {
+  it('submit: POST with { reservationId }, after 200 — Sent to Restaurant', () => {
     flushInitialLoad();
     button('Submit Pre-Order')!.click();
     fixture.detectChanges();
@@ -147,7 +147,7 @@ describe('Інтеграція з нашим бекендом (формати .N
     expect(toast.success).toHaveBeenCalledWith('Pre-order sent to the restaurant');
   });
 
-  it('submit: 400 бекенду { message, errorCode } → toast з текстом API, кнопка знову активна', () => {
+  it('submit: backend 400 { message, errorCode } → toast with the API text, button enabled again', () => {
     flushInitialLoad();
     button('Submit Pre-Order')!.click();
     fixture.detectChanges();
@@ -163,7 +163,7 @@ describe('Інтеграція з нашим бекендом (формати .N
     expect(element.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it('remove guest: DELETE з токеном, 409 бекенду { error } → toast, список не змінюється', () => {
+  it('remove guest: DELETE with token, backend 409 { error } → toast, list unchanged', () => {
     flushInitialLoad();
     (element.querySelector('button[aria-label="Remove Olena"]') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -179,7 +179,7 @@ describe('Інтеграція з нашим бекендом (формати .N
     expect(element.querySelectorAll('app-participant-card').length).toBe(3);
   });
 
-  it('запрошення недоступне (400 від /guest/invites, напр. група заповнена) → екран помилки з Try again', () => {
+  it('invite unavailable (400 from /guest/invites, e.g. group is full) → error screen with Try again', () => {
     http.expectOne(`${API}/reservations/${RES}/invite-token`).flush({ token: 'tok-1' });
     http
       .expectOne(`${API}/guest/invites/tok-1`)

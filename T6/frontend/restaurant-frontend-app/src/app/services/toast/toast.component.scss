@@ -55,7 +55,7 @@
   grid-row: 1;
 }
 
-// Без заголовка повідомлення стоїть в одному рядку зі значком, а не під ним.
+// Without a title the message sits on the same line as the icon, not below it.
 .toast-content--no-title {
   .toast-message {
     grid-row: 1;

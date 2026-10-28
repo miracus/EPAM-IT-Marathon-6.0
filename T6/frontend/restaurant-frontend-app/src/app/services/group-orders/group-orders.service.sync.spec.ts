@@ -1,5 +1,5 @@
-// Рівень 3 · тихі запити для фонової синхронізації: { silent: true } → SKIP_ERROR_TOAST.
-// Запуск: npm run test:hw
+// Level 3 · silent requests for background sync: { silent: true } → SKIP_ERROR_TOAST.
+// Run: npm run test:hw
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';

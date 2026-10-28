@@ -173,7 +173,7 @@ export class CardReservationComponent {
       queryParams,
     });
   }
-  /** Owner групового бронювання: що обрав кожен гість + спільний pre-order. */
+  /** Owner of a group reservation: what each guest chose + the shared pre-order. */
   onGroupPreOrder(): void {
     void this.router.navigate(['/reservations', this.r().id, 'group-order']);
   }

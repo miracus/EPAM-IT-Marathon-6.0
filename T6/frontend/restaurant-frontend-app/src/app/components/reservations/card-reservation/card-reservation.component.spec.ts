@@ -28,7 +28,7 @@ describe('CardReservationComponent', () => {
 
     fixture = TestBed.createComponent(CardReservationComponent);
     component = fixture.componentInstance;
-    // r — обов'язковий input: без нього компонент падає з NG0950
+    // r is a required input: without it the component fails with NG0950
     fixture.componentRef.setInput('r', RESERVATION);
     fixture.detectChanges();
   });
