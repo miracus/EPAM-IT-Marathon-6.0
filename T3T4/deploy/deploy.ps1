@@ -168,7 +168,17 @@ use_cloudfront = $(if ($CloudFront) { 'true' } else { 'false' })
 
     Push-Location $Frontend
     try {
-      Run 'npm ci --no-audit --no-fund'
+      # Reinstall only when package-lock.json changed: a running `npm start` (or a leftover esbuild.exe)
+      # locks node_modules on Windows and makes `npm ci` fail with EPERM.
+      $lockHash = (Get-FileHash 'package-lock.json' -Algorithm SHA256).Hash
+      $marker = Join-Path 'node_modules' '.deploy-lock-hash'
+      if ((Test-Path $marker) -and ((Get-Content $marker -Raw).Trim() -eq $lockHash)) {
+        Ok 'node_modules are up to date (package-lock.json unchanged) - skipping npm ci'
+      } else {
+        Get-Process esbuild -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Run 'npm ci --no-audit --no-fund'
+        Set-Content -Path $marker -Value $lockHash -Encoding ascii
+      }
       Run 'npm run build'
       Run "aws s3 sync dist/restaurant-frontend-app/browser s3://$FrontendBucket/ --delete"
     } finally { Pop-Location }
