@@ -23,7 +23,7 @@ import { GroupOrdersService } from '@app/services/group-orders/group-orders.serv
 import { ToastService } from '@app/services/toast/toast.service';
 import { Participant } from '@app/models/group-orders/participant.model';
 import { GroupReservationStatus } from '@app/models/group-orders/group-status.model';
-import { GuestInvite } from '@app/models/reservations/guest-invite.model';
+import { GroupInvite } from '@app/models/group-orders/group-invite.model';
 import { consolidatePreOrder } from '@app/shared/helpers/consolidate-pre-order';
 import { ParticipantCardComponent } from '@app/components/group-orders/participant-card/participant-card.component';
 import { ModalComponent } from '@app/shared/custom-components/modal/modal.component';
@@ -55,7 +55,7 @@ export class GroupOrderPageComponent {
 
   // ---- state
   readonly loadState = signal<LoadState>('loading');
-  readonly invite = signal<GuestInvite | null>(null);
+  readonly invite = signal<GroupInvite | null>(null);
   readonly ownerSessionId = signal('');
   readonly participants = signal<Participant[]>([]);
   readonly status = signal<GroupReservationStatus>('Open');
@@ -83,6 +83,12 @@ export class GroupOrderPageComponent {
     const max = this.invite()?.MaxGuestCount;
     const joined = this.participants().length;
     return max ? `${joined} of ${max} guests` : `${joined} ${joined === 1 ? 'guest' : 'guests'}`;
+  });
+
+  /** Link guests open to join the group (same as the one shown after booking). */
+  readonly inviteLink = computed(() => {
+    const token = this.invite()?.inviteToken;
+    return token ? `${window.location.origin}/join/${encodeURIComponent(token)}` : null;
   });
 
   readonly hasAnyDishes = computed(() => this.participants().some((person) => person.items.length > 0));
@@ -221,6 +227,22 @@ export class GroupOrderPageComponent {
   private markUpdated(): void {
     this.lastUpdated.set(new Date());
     this.refreshFailed.set(false);
+  }
+
+  // ---- invite link
+
+  async copyInviteLink(): Promise<void> {
+    const link = this.inviteLink();
+    if (!link) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(link);
+      this.toast.success('Share it with your guests.', 'Invite link copied');
+    } catch {
+      this.toast.error('Could not copy the link. Please copy it manually.');
+    }
   }
 
   // ---- Submit

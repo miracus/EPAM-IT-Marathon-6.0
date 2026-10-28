@@ -189,17 +189,19 @@ try {
   $participants = @($r.Json.participants)
   Check '4 participants (owner + 3 guests)' ($participants.Count -eq 4) "(got $($participants.Count))"
   Check 'owner is first' ($participants[0].type -eq 'Owner') "(got $($participants[0].type))"
+  # The owner card shows the owner's own pre-order (Spring Salad x1 from POST /orders above).
+  Check 'owner card = own pre-order, total 19, submitted' ([decimal]$participants[0].total -eq 19 -and $participants[0].isSubmitted -eq $true) "(got $($participants[0].total), $($participants[0].isSubmitted))"
   Check 'owner name comes from the profile' ($participants[0].name -eq 'Oleh') "(got $($participants[0].name))"
   $annaP = $participants | Where-Object { $_.id -eq $anna.sessionId }
   Check 'Anna total = 60' ([decimal]$annaP.total -eq 60) "(got $($annaP.total))"
   Check 'Anna isSubmitted = true' ($annaP.isSubmitted -eq $true)
-  Check 'group total = 101' ([decimal]$r.Json.total -eq 101) "(got $($r.Json.total))"
+  Check 'group total = 120 (owner 19 + Anna 60 + Olena 22 + Maksym 19)' ([decimal]$r.Json.total -eq 120) "(got $($r.Json.total))"
   Check 'total = sum of participants' ([decimal]$r.Json.total -eq (Sum-Of ($participants | ForEach-Object { $_.total })))
   $saladSummary = @($r.Json.summaryByDish) | Where-Object { $_.dishId -eq $salad }
-  Check 'summaryByDish: Spring Salad x3' ($saladSummary.quantity -eq 3) "(got $($saladSummary.quantity))"
+  Check 'summaryByDish: Spring Salad x4 (owner 1 + Anna 2 + Maksym 1)' ($saladSummary.quantity -eq 4) "(got $($saladSummary.quantity))"
 
   $legacy = Invoke-Api GET "/guest/group/$groupId/sessions" $null $ownerToken
-  Check 'legacy path /guest/group/{id}/sessions works' ($legacy.Status -eq 200 -and [decimal]$legacy.Json.total -eq 101) "(got $($legacy.Status))"
+  Check 'legacy path /guest/group/{id}/sessions works' ($legacy.Status -eq 200 -and [decimal]$legacy.Json.total -eq 120) "(got $($legacy.Status), $($legacy.Json.total))"
   Expect (Invoke-Api GET "/guest/groups/$groupId/sessions" $null $tokens.stranger) 403 'not the owner'
   Expect (Invoke-Api GET "/guest/groups/00000000-0000-0000-0000-000000000000/sessions" $null $ownerToken) 404 'unknown group'
   Expect (Invoke-Api GET "/guest/groups/$groupId/sessions") 401 'no token'
@@ -208,7 +210,7 @@ try {
   Step '4. US15/US16  DELETE .../sessions/{sid}/dishes/{dishId} + guest notice'
   $r = Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($anna.sessionId)/dishes/$soup" $null $ownerToken
   Expect $r 200 'owner removes Tom Yum from Anna'
-  Check 'group total = 79 after removal' ([decimal]$r.Json.total -eq 79) "(got $($r.Json.total))"
+  Check 'group total = 98 after removal' ([decimal]$r.Json.total -eq 98) "(got $($r.Json.total))"
   $g = Invoke-Api GET "/guest/sessions/$($anna.sessionId)" $null $anna.sessionToken
   $notices = @($g.Json.notices | Where-Object { $_ })
   Check 'Anna sees 1 notice' ($g.Status -eq 200 -and $notices.Count -eq 1) "(status $($g.Status), notices $($notices.Count))"
@@ -227,7 +229,7 @@ try {
   $participants = @($r.Json.participants)
   Check '3 participants left' ($participants.Count -eq 3) "(got $($participants.Count))"
   Check 'Maksym is gone' (-not ($participants | Where-Object { $_.id -eq $maksym.sessionId }))
-  Check 'new total = 60 (Anna 38 + Olena 22)' ([decimal]$r.Json.total -eq 60) "(got $($r.Json.total))"
+  Check 'new total = 79 (owner 19 + Anna 38 + Olena 22)' ([decimal]$r.Json.total -eq 79) "(got $($r.Json.total))"
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($maksym.sessionId)" $null $ownerToken) 404 'already removed'
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$ownerSessionId" $null $ownerToken) 400 "owner's own session"
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($olena.sessionId)" $null $tokens.stranger) 403 'not the owner'
@@ -257,6 +259,17 @@ try {
   Check 'group status = Submitted' ($status.Json.status -eq 'Submitted') "(got $($status.Status) $($status.Text))"
   Expect (Invoke-Api POST "/group-reservations/$groupId/submit" @{ reservationId = $reservationId } $ownerToken) 409 'second submit'
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($olena.sessionId)" $null $ownerToken) 409 'delete after submit'
+
+  # ------------------------------------------------------------------ 7. Owner keeps access after submit
+  Step '7. Owner screen after submit (reload) and guest access'
+  $r = Invoke-Api GET "/reservations/$reservationId/invite-token" $null $ownerToken
+  Expect $r 200 'owner gets the invite token after submit'
+  Expect (Invoke-Api GET "/guest/invites/$($invite.token)" $null $ownerToken) 200 'owner opens the invite after submit'
+  $guestInvite = Invoke-Api GET "/guest/invites/$($invite.token)"
+  Check 'a guest cannot open the submitted group' ($guestInvite.Status -ne 200) "(got $($guestInvite.Status))"
+  $r = Invoke-Api GET "/guest/groups/$groupId/sessions" $null $ownerToken
+  $ownerCard = @($r.Json.participants)[0]
+  Check 'owner card after submit = own dishes only (Spring Salad x1)' (@($ownerCard.items).Count -eq 1 -and @($ownerCard.items)[0].quantity -eq 1) "(got $(@($ownerCard.items).Count) items)"
 }
 catch {
   $script:Failed++
