@@ -237,7 +237,10 @@ try {
   # ------------------------------------------------------------------ 5b. US13-US19 while the group is open
   Step '5b. US13/US14/US15/US16/US18/US19  before submit'
   $r = Invoke-Api GET "/guest/groups/$groupId/sessions" $null $ownerToken
-  Check 'US13: cutoffAt is returned, 2 h before the start' ($r.Json.cutoffAt -and ([datetime]$r.Json.cutoffAt).ToString('HH:mm') -eq $start.AddHours(-2).ToString('HH:mm')) "(got $($r.Json.cutoffAt))"
+  # Compare in UTC: Windows PowerShell turns "...Z" into local time when cast to [datetime].
+  $cut = $r.Json.cutoffAt
+  $cutText = if ($cut -is [datetime]) { $cut.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm') } elseif ($cut) { "$cut".Substring(0, 16) } else { '' }
+  Check 'US13: cutoffAt is returned, 2 h before the start' ($cutText -eq $start.AddHours(-2).ToString('yyyy-MM-ddTHH:mm')) "(got $cut)"
   Check 'US13: secondsUntilCutoff > 0 and not locked' ([long]$r.Json.secondsUntilCutoff -gt 0 -and $r.Json.isLocked -eq $false) "(got $($r.Json.secondsUntilCutoff), $($r.Json.isLocked))"
   Check 'US14: auto-remind is on by default' ($r.Json.autoRemind -eq $true)
   Expect (Invoke-Api GET "/guest/groups/$groupId/payment" $null $ownerToken) 400 'US17: payment before submit'
