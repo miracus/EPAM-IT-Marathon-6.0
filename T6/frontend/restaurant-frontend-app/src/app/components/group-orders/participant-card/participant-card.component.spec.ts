@@ -1,5 +1,5 @@
-// Практичне · картка учасника. Тести готові — пиши код, поки всі не стануть зеленими.
-// Запуск: npm run test:hw
+// Practice · participant card. Tests are given — write code until they are all green.
+// Run: npm run test:hw
 import { TestBed } from '@angular/core/testing';
 import { Participant } from '@app/models/group-orders/participant.model';
 import { ParticipantCardComponent } from './participant-card.component';
@@ -16,7 +16,7 @@ const OWNER: Participant = { id: 'owner', type: 'Owner', name: 'Yevhenii', isSub
 
 function render(participant: Participant): HTMLElement {
   const fixture = TestBed.createComponent(ParticipantCardComponent);
-  fixture.componentRef.setInput('participant', participant); // так у тесті передаємо input
+  fixture.componentRef.setInput('participant', participant); // this is how a test passes an input
   fixture.detectChanges();
   return fixture.nativeElement as HTMLElement;
 }

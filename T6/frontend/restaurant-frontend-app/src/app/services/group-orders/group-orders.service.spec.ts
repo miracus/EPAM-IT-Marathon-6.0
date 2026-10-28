@@ -1,5 +1,5 @@
-// Рівень 2 · сервіс GroupOrdersService: URL, метод, тіло кожного запиту.
-// Запуск: npm run test:hw
+// Level 2 · GroupOrdersService: URL, method and body of every request.
+// Run: npm run test:hw
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';

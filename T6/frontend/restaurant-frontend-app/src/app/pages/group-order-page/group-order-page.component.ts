@@ -29,7 +29,7 @@ import { ParticipantCardComponent } from '@app/components/group-orders/participa
 import { ModalComponent } from '@app/shared/custom-components/modal/modal.component';
 import { GroupOrderSnapshot, GroupOrderSync, LoadState } from './models';
 
-/** Як часто підтягувати свіжі кошики, поки група Open. */
+/** How often fresh carts are pulled while the group is Open. */
 export const GROUP_ORDER_SYNC_MS = 15_000;
 
 const STATUS_LABELS: Record<GroupReservationStatus, string> = {
@@ -53,7 +53,7 @@ export class GroupOrderPageComponent {
 
   readonly reservationId = this.route.snapshot.paramMap.get('reservationId') ?? '';
 
-  // ---- стан
+  // ---- state
   readonly loadState = signal<LoadState>('loading');
   readonly invite = signal<GuestInvite | null>(null);
   readonly ownerSessionId = signal('');
@@ -70,8 +70,8 @@ export class GroupOrderPageComponent {
   readonly removeTarget = signal<Participant | null>(null);
   readonly removing = signal(false);
 
-  // ---- похідні значення
-  /** Замовлення для ресторану: лише підтверджені кошики, однакові страви — одним рядком. */
+  // ---- derived values
+  /** Order for the restaurant: submitted carts only, identical dishes merged into one line. */
   readonly consolidated = computed(() => consolidatePreOrder(this.participants()));
   readonly grandTotal = computed(() => this.consolidated().total);
   readonly dishCount = computed(() => this.consolidated().items.reduce((sum, item) => sum + item.quantity, 0));
@@ -110,7 +110,7 @@ export class GroupOrderPageComponent {
     this.load();
   }
 
-  // ---- завантаження
+  // ---- loading
 
   load(): void {
     this.loadSubscription?.unsubscribe();
@@ -136,7 +136,7 @@ export class GroupOrderPageComponent {
   private loadSnapshot$(): Observable<GroupOrderSnapshot> {
     return this.groupOrders.getGroupInvite$(this.reservationId).pipe(
       switchMap((invite) =>
-        // Спершу id власної сесії: бекенд створює її, якщо ще немає, — тоді вона вже буде в списку.
+        // Owner session id first: the backend creates it if missing, so it is already in the list.
         this.groupOrders.getOwnerSessionId$(this.reservationId).pipe(
           catchError(() => of('')),
           switchMap((ownerSessionId) =>
@@ -157,7 +157,7 @@ export class GroupOrderPageComponent {
     );
   }
 
-  // ---- фонова синхронізація (рівень 3)
+  // ---- background sync (level 3)
 
   private startSync(): void {
     this.stopSync();
@@ -168,7 +168,7 @@ export class GroupOrderPageComponent {
     this.syncSubscription = interval(GROUP_ORDER_SYNC_MS)
       .pipe(
         takeWhile(() => this.isOpen()),
-        // Якщо попередній запит (або ручний Refresh) ще не відповів — новий не стартує.
+        // If the previous request (or a manual Refresh) is still pending, a new one does not start.
         exhaustMap(() => (this.refreshing() ? EMPTY : this.syncOnce$())),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -187,7 +187,7 @@ export class GroupOrderPageComponent {
     this.syncOnce$().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
   }
 
-  /** Тихе оновлення: без лоадера і без toast; при помилці лишаємо останні дані. */
+  /** Silent refresh: no loader and no toast; on error the last data stays on screen. */
   private syncOnce$(): Observable<GroupOrderSync> {
     const groupId = this.invite()?.GroupReservationId;
     if (!groupId) {
@@ -257,12 +257,12 @@ export class GroupOrderPageComponent {
           this.submitDialogOpen.set(false);
           this.toast.success('Pre-order sent to the restaurant');
         },
-        // Toast з текстом помилки вже показав tokenInterceptor — тут лише повертаємо екран у робочий стан.
+        // tokenInterceptor has already shown the error toast — just return the screen to a usable state.
         error: () => this.submitDialogOpen.set(false),
       });
   }
 
-  // ---- Remove Guest (бонус)
+  // ---- Remove Guest (bonus)
 
   askRemove(participant: Participant): void {
     if (this.isOpen() && participant.type === 'Guest') {

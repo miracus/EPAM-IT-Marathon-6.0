@@ -10,13 +10,13 @@ import { OwnerSessionResponse } from '@app/models/group-orders/owner-session.mod
 import { SubmitGroupPreOrderRequest, SubmittedDish } from '@app/models/group-orders/submit-group-pre-order.model';
 import { GroupRequestOptions } from '@app/models/group-orders/group-request-options.model';
 
-/** HTTP-запити екрана Owner групового pre-order (контракт — homework-backend.md). */
+/** HTTP calls of the Owner group pre-order screen (contract: homework-backend.md). */
 @Injectable({ providedIn: 'root' })
 export class GroupOrdersService {
   private readonly baseUrl = inject(API_BASE_URL);
   private readonly http = inject(HttpClient);
 
-  /** reservationId → invite-token → дані запрошення (GroupReservationId, адреса, час, MaxGuestCount). */
+  /** reservationId → invite-token → invite data (GroupReservationId, address, time, MaxGuestCount). */
   getGroupInvite$(reservationId: string): Observable<GuestInvite> {
     return this.http
       .get<GroupInviteToken>(`${this.baseUrl}/reservations/${encodeURIComponent(reservationId)}/invite-token`)
@@ -55,14 +55,14 @@ export class GroupOrdersService {
     );
   }
 
-  /** Бонус: Owner видаляє гостя; відповідь — оновлений snapshot групи. */
+  /** Bonus: the Owner removes a guest; the response is the updated group snapshot. */
   removeSession$(groupReservationId: string, guestSessionId: string): Observable<GroupSessionsResponse> {
     return this.http.delete<GroupSessionsResponse>(
       `${this.baseUrl}/guest/groups/${encodeURIComponent(groupReservationId)}/sessions/${encodeURIComponent(guestSessionId)}`,
     );
   }
 
-  /** silent: true — фоновий запит, помилку не показуємо toast-ом. */
+  /** silent: true — background request, errors are not shown as a toast. */
   private context({ silent = false }: GroupRequestOptions): HttpContext {
     return new HttpContext().set(SKIP_ERROR_TOAST, silent);
   }

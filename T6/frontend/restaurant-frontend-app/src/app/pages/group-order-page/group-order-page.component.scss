@@ -19,7 +19,7 @@
   margin: 0 auto;
 }
 
-// ---- шапка
+// ---- header
 .page-header {
   padding-bottom: 12px;
   border-bottom: 1px solid color.$green-150;
@@ -69,7 +69,7 @@
   }
 }
 
-// ---- синхронізація і плашки
+// ---- sync line and banners
 .sync {
   display: flex;
   flex-wrap: wrap;
@@ -132,7 +132,7 @@
   }
 }
 
-// ---- учасники
+// ---- participants
 .participants {
   display: flex;
   flex-direction: column;
@@ -140,7 +140,7 @@
   list-style: none;
 }
 
-// ---- консолідоване замовлення
+// ---- consolidated order
 .consolidated {
   padding: 16px;
   border: 1px dashed color.$green-300;
@@ -181,7 +181,7 @@
   white-space: nowrap;
 }
 
-// ---- підсумок
+// ---- summary
 .summary {
   display: flex;
   flex-direction: column;
@@ -206,7 +206,7 @@
   font-weight: 600;
 }
 
-// ---- стани
+// ---- states
 .state {
   display: flex;
   flex-direction: column;
@@ -244,7 +244,7 @@
   }
 }
 
-// ---- діалоги
+// ---- dialogs
 .dialog-text {
   line-height: 24px;
 }
@@ -277,7 +277,7 @@
   }
 }
 
-// ---- телефон (375 px)
+// ---- phone (375 px)
 @media (max-width: 480px) {
   .page {
     padding: 20px 12px 32px;

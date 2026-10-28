@@ -1,5 +1,5 @@
-// Рівень 3 · синхронізація з бекендом: кожні 15 с, поки група Open.
-// fakeAsync + tick(15_000) «прокручує» час без очікування. Запуск: npm run test:hw
+// Level 3 · sync with the backend every 15 s while the group is Open.
+// fakeAsync + tick(15_000) fast-forwards time without waiting. Run: npm run test:hw
 import { TestBed, discardPeriodicTasks, fakeAsync, tick } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
@@ -59,7 +59,7 @@ describe('Рівень 3 · синхронізація', () => {
     expect(element.textContent).toContain('Still choosing');
 
     const updated = structuredClone(SESSIONS);
-    updated.participants[1].isSubmitted = true; // Olena підтвердила кошик, поки Owner дивиться
+    updated.participants[1].isSubmitted = true; // Olena submitted her cart while the Owner is watching
     service.getSessions$.and.returnValue(of(updated));
     tick(SYNC_MS);
     fixture.detectChanges();

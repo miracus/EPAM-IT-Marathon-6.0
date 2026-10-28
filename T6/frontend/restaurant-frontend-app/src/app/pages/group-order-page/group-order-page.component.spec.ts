@@ -1,5 +1,5 @@
-// Рівень 2 · сторінка на даних з API. Сервіс підмінено шпигуном — у мережу тест не ходить.
-// Запуск: npm run test:hw
+// Level 2 · page on API data. The service is replaced with a spy — the test makes no network calls.
+// Run: npm run test:hw
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';

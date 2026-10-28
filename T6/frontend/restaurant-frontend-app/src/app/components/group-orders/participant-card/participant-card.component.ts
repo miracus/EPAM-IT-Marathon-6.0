@@ -11,9 +11,9 @@ import { Participant } from '@app/models/group-orders/participant.model';
 })
 export class ParticipantCardComponent {
   readonly participant = input.required<Participant>();
-  /** Картка власного кошика Owner — підпис «My Pre-Order». */
+  /** The Owner's own cart — titled "My Pre-Order". */
   readonly isMe = input(false);
-  /** Показати «Remove Guest» (лише гості й лише поки група Open). */
+  /** Show "Remove Guest" (guests only, and only while the group is Open). */
   readonly canRemove = input(false);
 
   readonly removeClick = output<Participant>();

@@ -1,4 +1,4 @@
-// Бонус · Remove Guest — сервіс. Запуск: npm run test:hw
+// Bonus · Remove Guest — service. Run: npm run test:hw
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
