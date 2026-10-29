@@ -40,7 +40,11 @@ function Invoke-Aws([string[]]$Arguments) {
     $out = & aws @Arguments --region $Region --output json 2> $errFile
     $code = $LASTEXITCODE
     $ErrorActionPreference = $previous
-    if ($code -eq 0) { return ($out | Out-String | ConvertFrom-Json) }
+    if ($code -eq 0) {
+      $text = ($out | Out-String).Trim()
+      if (-not $text) { return $null }   # e.g. delete-item prints nothing
+      return ($text | ConvertFrom-Json)
+    }
 
     $message = (Get-Content $errFile -Raw -ErrorAction SilentlyContinue)
     if ($message -match 'Throttl|ProvisionedThroughputExceeded|RequestLimitExceeded' -and $attempt -lt 6) {
@@ -138,24 +142,17 @@ if (-not $Delete) {
   return
 }
 
-$answer = Read-Host "`nDeletion cannot be undone. Type DELETE to remove $($toDelete.Count) items"
-if ($answer -ne 'DELETE') { Write-Host 'Cancelled.' -ForegroundColor Yellow; return }
+$answer = Read-Host "`nDeletion cannot be undone. Type DELETE (capital letters) to remove $($toDelete.Count) items"
+if ($answer -cne 'DELETE') { Write-Host 'Cancelled.' -ForegroundColor Yellow; return }
 
-foreach ($group in $toDelete | Group-Object Table) {
-  $items = @($group.Group)
-  for ($i = 0; $i -lt $items.Count; $i += 25) {
-    $chunk = $items[$i..([Math]::Min($i + 24, $items.Count - 1))]
-    $request = @{ ($group.Name) = @($chunk | ForEach-Object { @{ DeleteRequest = @{ Key = $_.Key } } }) }
-    for ($attempt = 1; $attempt -le 6; $attempt++) {
-      $result = Invoke-Aws @('dynamodb', 'batch-write-item', '--request-items', (Write-JsonFile $request))
-      if ($result.UnprocessedItems.PSObject.Properties.Count -eq 0) { break }
-      # Low write capacity: DynamoDB returns the rest as UnprocessedItems - send them again after a pause.
-      $request = $result.UnprocessedItems
-      Start-Sleep -Seconds (2 * $attempt)
-    }
-    if ($result.UnprocessedItems.PSObject.Properties.Count -gt 0) { throw "Some $($group.Name) items were not deleted - run the script again." }
+# One delete-item call per item: slower than batch-write-item, but simple and safe with 1 write capacity unit.
+foreach ($group in $toDelete | Group-Object Table | Sort-Object Name) {
+  $done = 0
+  foreach ($item in $group.Group) {
+    $null = Invoke-Aws @('dynamodb', 'delete-item', '--table-name', $group.Name, '--key', (Write-JsonFile $item.Key))
+    $done++
   }
-  Write-Host "  deleted $($group.Name): $($items.Count)" -ForegroundColor Green
+  Write-Host "  deleted $($group.Name): $done" -ForegroundColor Green
 }
 
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
