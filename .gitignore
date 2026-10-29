@@ -33,3 +33,6 @@ syndicate_venv/
 .syndicate-config-*/logs/
 .syndicate
 _project_export.tgz
+
+# Local credentials created by seed scripts
+*.local.txt
