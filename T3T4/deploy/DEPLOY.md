@@ -73,7 +73,15 @@ API:   https://xxxx.execute-api.eu-north-1.amazonaws.com/develop
 - Змінився бекенд: `.\deploy.ps1 -Email ... -Only backend`
 - Змінився фронтенд: `.\deploy.ps1 -Email ... -Only frontend`
 
-## 5. Видалити все (після здачі марафону)
+## 5. Початкові дані: локації й страви
+
+```powershell
+.\seed-data.ps1
+```
+
+Скрипт завантажує в DynamoDB 3 локації (9 Abashidze Street, 14 Baratashvili Street, 48 Rustaveli Avenue) і 8 страв з `seed\locations.json` та `seed\dishes.json`. Це дані марафону з виправленнями (див. коментар у скрипті). Повторний запуск безпечний: перезаписуються лише записи з цими id. Столиків для цих локацій у даних немає — додай їх через `POST /tables` або адмінку.
+
+## 6. Видалити все (після здачі марафону)
 
 ```powershell
 .\cleanup.ps1
