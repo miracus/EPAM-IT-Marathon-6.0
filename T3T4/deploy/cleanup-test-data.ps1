@@ -30,10 +30,26 @@ function Write-JsonFile($object) {
   return 'file://' + ($file -replace '\\', '/')
 }
 
+# Windows PowerShell treats anything aws.exe writes to stderr as an error, so stderr is captured
+# separately. The tables have 1 read/write capacity unit: throttled calls are retried with a pause.
 function Invoke-Aws([string[]]$Arguments) {
-  $out = & aws @Arguments --region $Region --output json
-  if ($LASTEXITCODE -ne 0) { throw "aws $($Arguments -join ' ') failed" }
-  return ($out | Out-String | ConvertFrom-Json)
+  $errFile = Join-Path $tmp 'aws-stderr.txt'
+  for ($attempt = 1; $attempt -le 6; $attempt++) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $out = & aws @Arguments --region $Region --output json 2> $errFile
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+    if ($code -eq 0) { return ($out | Out-String | ConvertFrom-Json) }
+
+    $message = (Get-Content $errFile -Raw -ErrorAction SilentlyContinue)
+    if ($message -match 'Throttl|ProvisionedThroughputExceeded|RequestLimitExceeded' -and $attempt -lt 6) {
+      Write-Host "    throttled, waiting $(2 * $attempt) s..." -ForegroundColor DarkGray
+      Start-Sleep -Seconds (2 * $attempt)
+      continue
+    }
+    throw "aws $($Arguments[0..1] -join ' ') failed: $message"
+  }
 }
 
 # Query a GSI (or the table key) by one string attribute.
@@ -72,13 +88,14 @@ function Get-SpecialtyIds($location) {
 }
 $keepDishIds = @($allLocations | Where-Object { $testIds -notcontains $_.id.S } | ForEach-Object { Get-SpecialtyIds $_ })
 $dishIds = New-Object System.Collections.Generic.HashSet[string]
+$allDishes = @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Dishes')).Items)
 
 foreach ($location in $locations) {
   $locationId = $location.id.S
   Write-Host "  $($location.address.S)" -ForegroundColor Gray
   Add-Key 'Locations' @{ id = @{ S = $locationId } }
 
-  foreach ($dish in Get-ByScan 'Dishes' 'locationId' $locationId) { [void]$dishIds.Add($dish.id.S) }
+  foreach ($dish in $allDishes | Where-Object { $_.locationId.S -eq $locationId }) { [void]$dishIds.Add($dish.id.S) }
   foreach ($specialtyId in Get-SpecialtyIds $location) { [void]$dishIds.Add($specialtyId) }
   foreach ($waiter in Get-ByKey 'Waiters' 'locationId-index' 'locationId' $locationId) { Add-Key 'Waiters' @{ userId = $waiter.userId } }
 
@@ -104,7 +121,7 @@ foreach ($location in $locations) {
 }
 
 # Dishes created by e2e-preorder.ps1 / l3-test.ps1 also have "(e2e)" / "(L3)" at the end of the description.
-foreach ($dish in @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Dishes')).Items)) {
+foreach ($dish in $allDishes) {
   if ($dish.description.S -match '\((e2e|L3)\)$') { [void]$dishIds.Add($dish.id.S) }
 }
 
@@ -129,7 +146,13 @@ foreach ($group in $toDelete | Group-Object Table) {
   for ($i = 0; $i -lt $items.Count; $i += 25) {
     $chunk = $items[$i..([Math]::Min($i + 24, $items.Count - 1))]
     $request = @{ ($group.Name) = @($chunk | ForEach-Object { @{ DeleteRequest = @{ Key = $_.Key } } }) }
-    $result = Invoke-Aws @('dynamodb', 'batch-write-item', '--request-items', (Write-JsonFile $request))
+    for ($attempt = 1; $attempt -le 6; $attempt++) {
+      $result = Invoke-Aws @('dynamodb', 'batch-write-item', '--request-items', (Write-JsonFile $request))
+      if ($result.UnprocessedItems.PSObject.Properties.Count -eq 0) { break }
+      # Low write capacity: DynamoDB returns the rest as UnprocessedItems - send them again after a pause.
+      $request = $result.UnprocessedItems
+      Start-Sleep -Seconds (2 * $attempt)
+    }
     if ($result.UnprocessedItems.PSObject.Properties.Count -gt 0) { throw "Some $($group.Name) items were not deleted - run the script again." }
   }
   Write-Host "  deleted $($group.Name): $($items.Count)" -ForegroundColor Green
