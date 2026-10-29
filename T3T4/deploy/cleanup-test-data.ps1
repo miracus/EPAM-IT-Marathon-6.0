@@ -62,12 +62,21 @@ $locations = @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Locations')).I
 
 if ($locations.Count -eq 0) { Write-Host '  Nothing to clean up.' -ForegroundColor Green; return }
 
+# Dishes created through POST /dishes are linked via location.specialtyDishIds (no locationId attribute).
+# A dish is removed only if no real (non-test) location uses it.
+$allLocations = @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Locations')).Items)
+$testIds = @($locations | ForEach-Object { $_.id.S })
+$keepDishIds = @($allLocations | Where-Object { $testIds -notcontains $_.id.S } |
+  ForEach-Object { @($_.specialtyDishIds.L) | ForEach-Object { $_.S } })
+$dishIds = New-Object System.Collections.Generic.HashSet[string]
+
 foreach ($location in $locations) {
   $locationId = $location.id.S
   Write-Host "  $($location.address.S)" -ForegroundColor Gray
   Add-Key 'Locations' @{ id = @{ S = $locationId } }
 
-  foreach ($dish in Get-ByScan 'Dishes' 'locationId' $locationId) { Add-Key 'Dishes' @{ id = $dish.id } }
+  foreach ($dish in Get-ByScan 'Dishes' 'locationId' $locationId) { [void]$dishIds.Add($dish.id.S) }
+  foreach ($specialty in @($location.specialtyDishIds.L)) { if ($specialty.S) { [void]$dishIds.Add($specialty.S) } }
   foreach ($waiter in Get-ByKey 'Waiters' 'locationId-index' 'locationId' $locationId) { Add-Key 'Waiters' @{ userId = $waiter.userId } }
 
   foreach ($table in Get-ByKey 'Tables' 'locationId-tableNumber-index' 'locationId' $locationId) {
@@ -89,6 +98,10 @@ foreach ($location in $locations) {
       }
     }
   }
+}
+
+foreach ($dishId in $dishIds) {
+  if ($keepDishIds -notcontains $dishId) { Add-Key 'Dishes' @{ id = @{ S = $dishId } } }
 }
 
 Write-Host "`nFound:" -ForegroundColor Cyan

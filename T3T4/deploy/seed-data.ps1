@@ -69,9 +69,10 @@ if (Test-Path $accountsFile) {
 }
 
 $waiters = @(
-  @{ email = 'waiter.abashidze@greentasty.example.com';    firstName = 'Nino';  lastName = 'Abashidze';    locationId = '7d598da3-0887-4a04-a3a1-fe26d8a4a4f2' },
-  @{ email = 'waiter.baratashvili@greentasty.example.com'; firstName = 'Giorgi'; lastName = 'Baratashvili'; locationId = '2de08053-9bec-4662-bf56-2ccb70aeeb78' },
-  @{ email = 'waiter.rustaveli@greentasty.example.com';    firstName = 'Tamar'; lastName = 'Rustaveli';    locationId = '98c4acc4-ca8b-4416-be9d-ef40f1e73e0a' }
+  # The backend accepts only top-level domains of 2-3 letters (user@domain.com), so example.com is used.
+  @{ email = 'waiter.abashidze@example.com';    firstName = 'Nino';  lastName = 'Abashidze';    locationId = '7d598da3-0887-4a04-a3a1-fe26d8a4a4f2' },
+  @{ email = 'waiter.baratashvili@example.com'; firstName = 'Giorgi'; lastName = 'Baratashvili'; locationId = '2de08053-9bec-4662-bf56-2ccb70aeeb78' },
+  @{ email = 'waiter.rustaveli@example.com';    firstName = 'Tamar'; lastName = 'Rustaveli';    locationId = '98c4acc4-ca8b-4416-be9d-ef40f1e73e0a' }
 )
 
 foreach ($w in $waiters) {
@@ -80,7 +81,7 @@ foreach ($w in $waiters) {
     $password = 'Wt#' + (Get-Random -Minimum 100000 -Maximum 999999) + 'aA'
     $reg = Invoke-Api POST '/register' @{ firstName = $w.firstName; lastName = $w.lastName; email = $w.email; password = $password; confirmPassword = $password }
     if ($reg.Status -notin 200, 201) {
-      Write-Host "  SKIP $($w.email): already registered, password unknown (HTTP $($reg.Status))" -ForegroundColor Yellow
+      Write-Host "  SKIP $($w.email): registration failed (HTTP $($reg.Status)) $($reg.Text)" -ForegroundColor Yellow
       continue
     }
     Add-Content -Path $accountsFile -Value "$($w.email) $password"
