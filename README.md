@@ -35,6 +35,14 @@
 
 PNG усіх станів лежать у папках `screens/` кожної версії. User Stories v3 у markdown: `T2/v3/USER_STORIES_v3.md`.
 
+## Реалізація і тестування
+
+| Етап | Де лежить |
+|---|---|
+| Бекенд (.NET Lambda, групове передзамовлення) | `T3T4/project/backend/restaurant-backend-app` |
+| Фронтенд (Angular, сторінка організатора і гостя) | `T6/frontend/restaurant-frontend-app` |
+| Тестування (QA, US11 Menu) | `T7/` |
+
 ## Як здати
 
 Покрокова інструкція: `SUBMISSION_GUIDE.md`.
