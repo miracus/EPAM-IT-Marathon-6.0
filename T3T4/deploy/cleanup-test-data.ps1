@@ -103,6 +103,11 @@ foreach ($location in $locations) {
   }
 }
 
+# Dishes created by e2e-preorder.ps1 / l3-test.ps1 also have "(e2e)" / "(L3)" at the end of the description.
+foreach ($dish in @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Dishes')).Items)) {
+  if ($dish.description.S -match '\((e2e|L3)\)$') { [void]$dishIds.Add($dish.id.S) }
+}
+
 foreach ($dishId in $dishIds) {
   if ($keepDishIds -notcontains $dishId) { Add-Key 'Dishes' @{ id = @{ S = $dishId } } }
 }
