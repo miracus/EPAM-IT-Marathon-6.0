@@ -5,6 +5,7 @@
   Test locations are the ones whose address starts with "E2E street" or "Frontend L3 street".
   For each of them the script collects: tables, dishes, waiter list entries, reservations of those
   tables, their orders, feedback, group reservations and guest sessions.
+  It also picks up orphans: tables and waiters whose location no longer exists.
 
   Without -Delete nothing is changed: the script only prints what it found.
   With -Delete it asks you to type DELETE and then removes exactly those items.
@@ -80,8 +81,6 @@ Write-Host "Looking for locations starting with: $($Prefixes -join ', ')" -Foreg
 $locations = @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Locations')).Items) |
   Where-Object { $address = $_.address.S; $Prefixes | Where-Object { $address -like "$_*" } }
 
-if ($locations.Count -eq 0) { Write-Host '  Nothing to clean up.' -ForegroundColor Green; return }
-
 # Dishes created through POST /dishes are linked via location.specialtyDishIds (no locationId attribute).
 # A dish is removed only if no real (non-test) location uses it.
 $allLocations = @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Locations')).Items)
@@ -94,6 +93,27 @@ $keepDishIds = @($allLocations | Where-Object { $testIds -notcontains $_.id.S } 
 $dishIds = New-Object System.Collections.Generic.HashSet[string]
 $allDishes = @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Dishes')).Items)
 
+# Everything below a table: its reservations, their orders, feedback, group reservations and guest sessions.
+function Add-TableTree($table) {
+  Add-Key 'Tables' @{ id = $table.id }
+  foreach ($reservation in Get-ByKey 'Reservations' 'GSI_ByTableId' 'tableId' $table.id.S) {
+    $reservationId = $reservation.id.S
+    Add-Key 'Reservations' @{ id = $reservation.id }
+    foreach ($order in Get-ByKey 'Orders' 'GSI_ReservationId' 'reservationId' $reservationId) {
+      Add-Key 'Orders' @{ orderId = $order.orderId; customerId = $order.customerId }
+    }
+    foreach ($feedback in Get-ByKey 'Feedback' '' 'reservationId' $reservationId) {
+      Add-Key 'Feedback' @{ reservationId = $feedback.reservationId; createdAt = $feedback.createdAt }
+    }
+    foreach ($group in Get-ByKey 'GroupReservations' 'reservationId' 'reservationId' $reservationId) {
+      Add-Key 'GroupReservations' @{ groupReservationId = $group.groupReservationId }
+      foreach ($session in Get-ByKey 'GuestSessions' 'groupReservationId' 'groupReservationId' $group.groupReservationId.S) {
+        Add-Key 'GuestSessions' @{ guestSessionId = $session.guestSessionId }
+      }
+    }
+  }
+}
+
 foreach ($location in $locations) {
   $locationId = $location.id.S
   Write-Host "  $($location.address.S)" -ForegroundColor Gray
@@ -103,24 +123,20 @@ foreach ($location in $locations) {
   foreach ($specialtyId in Get-SpecialtyIds $location) { [void]$dishIds.Add($specialtyId) }
   foreach ($waiter in Get-ByKey 'Waiters' 'locationId-index' 'locationId' $locationId) { Add-Key 'Waiters' @{ userId = $waiter.userId } }
 
-  foreach ($table in Get-ByKey 'Tables' 'locationId-tableNumber-index' 'locationId' $locationId) {
-    Add-Key 'Tables' @{ id = $table.id }
-    foreach ($reservation in Get-ByKey 'Reservations' 'GSI_ByTableId' 'tableId' $table.id.S) {
-      $reservationId = $reservation.id.S
-      Add-Key 'Reservations' @{ id = $reservation.id }
-      foreach ($order in Get-ByKey 'Orders' 'GSI_ReservationId' 'reservationId' $reservationId) {
-        Add-Key 'Orders' @{ orderId = $order.orderId; customerId = $order.customerId }
-      }
-      foreach ($feedback in Get-ByKey 'Feedback' '' 'reservationId' $reservationId) {
-        Add-Key 'Feedback' @{ reservationId = $feedback.reservationId; createdAt = $feedback.createdAt }
-      }
-      foreach ($group in Get-ByKey 'GroupReservations' 'reservationId' 'reservationId' $reservationId) {
-        Add-Key 'GroupReservations' @{ groupReservationId = $group.groupReservationId }
-        foreach ($session in Get-ByKey 'GuestSessions' 'groupReservationId' 'groupReservationId' $group.groupReservationId.S) {
-          Add-Key 'GuestSessions' @{ guestSessionId = $session.guestSessionId }
-        }
-      }
-    }
+  foreach ($table in Get-ByKey 'Tables' 'locationId-tableNumber-index' 'locationId' $locationId) { Add-TableTree $table }
+}
+
+# Orphans: tables and waiters whose location no longer exists (e.g. left after an interrupted cleanup).
+$liveIds = @($allLocations | Where-Object { $testIds -notcontains $_.id.S } | ForEach-Object { $_.id.S })
+foreach ($table in @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Tables')).Items)) {
+  if ($table.locationId.S -and $liveIds -notcontains $table.locationId.S -and $testIds -notcontains $table.locationId.S) {
+    Write-Host "  orphan table $($table.id.S) (location $($table.locationId.S))" -ForegroundColor Gray
+    Add-TableTree $table
+  }
+}
+foreach ($waiter in @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Waiters')).Items)) {
+  if ($waiter.locationId.S -and $liveIds -notcontains $waiter.locationId.S -and $testIds -notcontains $waiter.locationId.S) {
+    Add-Key 'Waiters' @{ userId = $waiter.userId }
   }
 }
 
@@ -132,6 +148,8 @@ foreach ($dish in $allDishes) {
 foreach ($dishId in $dishIds) {
   if ($keepDishIds -notcontains $dishId) { Add-Key 'Dishes' @{ id = @{ S = $dishId } } }
 }
+
+if ($toDelete.Count -eq 0) { Write-Host '  Nothing to clean up.' -ForegroundColor Green; return }
 
 Write-Host "`nFound:" -ForegroundColor Cyan
 if (-not ($toDelete | Where-Object Table -eq 'Dishes')) { Write-Host '  (no test dishes found)' -ForegroundColor DarkGray }
@@ -146,7 +164,9 @@ $answer = Read-Host "`nDeletion cannot be undone. Type DELETE (capital letters) 
 if ($answer -cne 'DELETE') { Write-Host 'Cancelled.' -ForegroundColor Yellow; return }
 
 # One delete-item call per item: slower than batch-write-item, but simple and safe with 1 write capacity unit.
-foreach ($group in $toDelete | Group-Object Table | Sort-Object Name) {
+# Children first, locations last: if the run stops halfway, the next run still finds the rest.
+$order = @('GuestSessions', 'GroupReservations', 'Feedback', 'Orders', 'Reservations', 'Tables', 'Waiters', 'Dishes', 'Locations')
+foreach ($group in $toDelete | Group-Object Table | Sort-Object { $order.IndexOf($_.Name) }) {
   $done = 0
   foreach ($item in $group.Group) {
     $null = Invoke-Aws @('dynamodb', 'delete-item', '--table-name', $group.Name, '--key', (Write-JsonFile $item.Key))
