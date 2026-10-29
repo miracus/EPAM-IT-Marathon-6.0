@@ -19,7 +19,11 @@ public class GetGroupReservationStatusHandler(IGuestSessionService guestSessionS
 
         try
         {
-            var status = await guestSessionService.GetGroupReservationStatusAsync(groupReservationId);
+            // US16 AC5: ?guestSessionId= tells a guest whose session is gone that the owner removed them.
+            string? guestSessionId = null;
+            request.QueryStringParameters?.TryGetValue("guestSessionId", out guestSessionId);
+
+            var status = await guestSessionService.GetGroupReservationStatusAsync(groupReservationId, guestSessionId);
             return ResponseBuilder.CreateSuccessResponse(status);
         }
         catch (GroupReservationNotFoundException ex)

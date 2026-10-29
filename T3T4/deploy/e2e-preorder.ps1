@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  End-to-end check of the owner group pre-order API (homework L1-L3, US15/US16) on the deployed backend.
+  End-to-end check of the group pre-order API (homework L1-L3, US13-US21) on the deployed backend.
 
   Creates its own test data through the API (owner/waiter/stranger users on @example.com, a location,
   a table, dishes, a 5-guest reservation, 3 guests) and then calls every new endpoint, comparing
@@ -234,6 +234,74 @@ try {
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$ownerSessionId" $null $ownerToken) 400 "owner's own session"
   Expect (Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($olena.sessionId)" $null $tokens.stranger) 403 'not the owner'
 
+  # ------------------------------------------------------------------ 5b. US13-US19 while the group is open
+  Step '5b. US13/US14/US15/US16/US18/US19  before submit'
+  $r = Invoke-Api GET "/guest/groups/$groupId/sessions" $null $ownerToken
+  # Compare in UTC: Windows PowerShell turns "...Z" into local time when cast to [datetime].
+  $cut = $r.Json.cutoffAt
+  $cutText = if ($cut -is [datetime]) { $cut.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm') } elseif ($cut) { "$cut".Substring(0, 16) } else { '' }
+  Check 'US13: cutoffAt is returned, 2 h before the start' ($cutText -eq $start.AddHours(-2).ToString('yyyy-MM-ddTHH:mm')) "(got $cut)"
+  Check 'US13: secondsUntilCutoff > 0 and not locked' ([long]$r.Json.secondsUntilCutoff -gt 0 -and $r.Json.isLocked -eq $false) "(got $($r.Json.secondsUntilCutoff), $($r.Json.isLocked))"
+  Check 'US14: auto-remind is on by default' ($r.Json.autoRemind -eq $true)
+  Expect (Invoke-Api GET "/guest/groups/$groupId/payment" $null $ownerToken) 400 'US17: payment before submit'
+
+  # US18/US19: guest note, serving time and allergies
+  Expect (Invoke-Api PUT "/guest/sessions/$($anna.sessionId)/dishes/$salad" @{ note = 'No onion, please'; serveTime = 'AfterMains' } $anna.sessionToken) 200 'US18: Anna adds a note and serving time'
+  Expect (Invoke-Api PUT "/guest/sessions/$($anna.sessionId)/allergies" @{ allergies = 'Nuts' } $anna.sessionToken) 200 'US18: Anna states an allergy'
+  Expect (Invoke-Api PUT "/guest/sessions/$($anna.sessionId)/dishes/$salad" @{ note = ('a' * 81) } $anna.sessionToken) 400 'US18: note longer than 80'
+  Expect (Invoke-Api PUT "/guest/sessions/$($anna.sessionId)/dishes/$salad" @{ serveTime = 'Later' } $anna.sessionToken) 400 'US19: unknown serving time'
+  Expect (Invoke-Api PUT "/guest/sessions/$($anna.sessionId)/allergies" @{ allergies = 'x' } $olena.sessionToken) 401 'US18: another guest token'
+  $r = Invoke-Api PUT "/guest/groups/$groupId/my-dishes/$salad" @{ note = 'Extra lime' } $ownerToken
+  Expect $r 200 'US18: owner adds a note to own dish'
+  $r = Invoke-Api PUT "/guest/groups/$groupId/my-allergies" @{ allergies = 'Gluten' } $ownerToken
+  Expect $r 200 'US18: owner states own allergy'
+  $ownerCard = @($r.Json.participants)[0]
+  Check 'US18: owner card shows allergy and note' ($ownerCard.allergies -eq 'Gluten' -and @($ownerCard.items)[0].note -eq 'Extra lime') "(got $($ownerCard.allergies), $(@($ownerCard.items)[0].note))"
+  $annaP = @($r.Json.participants) | Where-Object { $_.id -eq $anna.sessionId }
+  $annaSalad = @($annaP.items) | Where-Object { $_.dish.id -eq $salad }
+  Check 'US18/US19: owner sees Anna note, AfterMains and Nuts' ($annaSalad.note -eq 'No onion, please' -and $annaSalad.serveTime -eq 'AfterMains' -and $annaP.allergies -eq 'Nuts') "(got $($annaSalad.note), $($annaSalad.serveTime), $($annaP.allergies))"
+  $annaSoup = @($annaP.items) | Where-Object { $_.dish.id -eq $soup }
+  Check 'US19: main course defaults to OnArrival' ($null -eq $annaSoup -or $annaSoup.serveTime -eq 'OnArrival')
+
+  # US15: Undo, "Changed by you", Ask to change order
+  $r = Invoke-Api POST "/guest/groups/$groupId/sessions/$($anna.sessionId)/dishes/$soup/restore" @{ quantity = 1 } $ownerToken
+  Expect $r 200 'US15: Undo puts Tom Yum back'
+  $annaP = @($r.Json.participants) | Where-Object { $_.id -eq $anna.sessionId }
+  Check 'US15: Anna total back to 60, not "changed"' ([decimal]$annaP.total -eq 60 -and $annaP.changedByOwner -eq $false) "(got $($annaP.total), $($annaP.changedByOwner))"
+  $r = Invoke-Api DELETE "/guest/groups/$groupId/sessions/$($anna.sessionId)/dishes/$soup" $null $ownerToken
+  $annaP = @($r.Json.participants) | Where-Object { $_.id -eq $anna.sessionId }
+  Check 'US15: removed again, "Changed by you"' ([decimal]$annaP.total -eq 38 -and $annaP.changedByOwner -eq $true) "(got $($annaP.total), $($annaP.changedByOwner))"
+  $g = Invoke-Api GET "/guest/sessions/$($anna.sessionId)" $null $anna.sessionToken
+  $n = @($g.Json.notices | Where-Object { $_ }) | Select-Object -Last 1
+  Check 'US16: notice has dish, old and new total' ($n.type -eq 'DishRemoved' -and $n.dishName -eq 'Tom Yum' -and [decimal]$n.oldTotal -eq 60 -and [decimal]$n.newTotal -eq 38) "(got $($n.type), $($n.dishName), $($n.oldTotal) -> $($n.newTotal))"
+  Check 'US16: guest sees organizer name and cut-off' ($g.Json.ownerName -eq 'Oleh' -and $g.Json.cutoffAt -and $g.Json.isLocked -eq $false) "(got $($g.Json.ownerName), $($g.Json.cutoffAt))"
+  $null = Invoke-Api POST "/guest/sessions/$($anna.sessionId)/notices/ack" $null $anna.sessionToken
+
+  $r = Invoke-Api POST "/guest/groups/$groupId/sessions/$($olena.sessionId)/change-request" $null $ownerToken
+  Expect $r 200 'US15: owner asks Olena to change her order'
+  $olenaP = @($r.Json.participants) | Where-Object { $_.id -eq $olena.sessionId }
+  Check 'US15: Olena is "still choosing" again' ($olenaP.isSubmitted -eq $false)
+  Expect (Invoke-Api POST "/guest/sessions/$($olena.sessionId)/submit" $null $olena.sessionToken) 200 'Olena submits again'
+  Expect (Invoke-Api POST "/guest/sessions/$($anna.sessionId)/reopen" $null $anna.sessionToken) 200 'US16: Anna reopens her cart (Pick another dish)'
+  Expect (Invoke-Api POST "/guest/sessions/$($anna.sessionId)/submit" $null $anna.sessionToken) 200 'Anna submits again'
+
+  # US14: reminders
+  $iryna = New-Guest 'Iryna' @() $false
+  $r = Invoke-Api POST "/guest/groups/$groupId/reminders" @{ } $ownerToken
+  Expect $r 200 'US14: Remind N'
+  Check 'US14: only Iryna (no dishes) is reminded' (@($r.Json.reminded).Count -eq 1 -and @($r.Json.reminded)[0].id -eq $iryna.sessionId) "(got $($r.Text))"
+  $r = Invoke-Api POST "/guest/groups/$groupId/reminders" @{ guestSessionIds = @($iryna.sessionId) } $ownerToken
+  Check 'US14: second reminder within 15 min is skipped' (@($r.Json.skipped).Count -eq 1 -and @($r.Json.reminded).Count -eq 0) "(got $($r.Text))"
+  $g = Invoke-Api GET "/guest/sessions/$($iryna.sessionId)" $null $iryna.sessionToken
+  Check 'US14: Iryna sees the reminder' (@($g.Json.notices | Where-Object { $_.type -eq 'Reminder' }).Count -eq 1) "(got $($g.Text))"
+  $r = Invoke-Api PUT "/guest/groups/$groupId/settings" @{ autoRemind = $false } $ownerToken
+  Check 'US14: auto-remind can be turned off' ($r.Status -eq 200 -and $r.Json.autoRemind -eq $false) "(got $($r.Status), $($r.Json.autoRemind))"
+  Expect (Invoke-Api POST "/guest/groups/$groupId/reminders" @{ } $tokens.stranger) 403 'US14: not the owner'
+
+  # US16 AC5: a removed guest learns about it
+  $s = Invoke-Api GET "/guest/groups/$groupId/status?guestSessionId=$($maksym.sessionId)"
+  Check 'US16: Maksym sees "removed from this group"' ($s.Status -eq 200 -and $s.Json.removed -eq $true) "(got $($s.Text))"
+
   # ------------------------------------------------------------------ 6. Level 2b: submit
   Step '6. L2  POST /group-reservations/{id}/submit'
   Expect (Invoke-Api POST "/group-reservations/$groupId/submit" @{ reservationId = $reservationId } $tokens.stranger) 403 'not the owner'
@@ -270,6 +338,64 @@ try {
   $r = Invoke-Api GET "/guest/groups/$groupId/sessions" $null $ownerToken
   $ownerCard = @($r.Json.participants)[0]
   Check 'owner card after submit = own dishes only (Spring Salad x1)' (@($ownerCard.items).Count -eq 1 -and @($ownerCard.items)[0].quantity -eq 1) "(got $(@($ownerCard.items).Count) items)"
+  Check 'US13: submittedAt is set, manual' ($r.Json.submittedAt -and $r.Json.submittedAutomatically -eq $false -and $r.Json.isLocked -eq $true) "(got $($r.Json.submittedAt), $($r.Json.submittedAutomatically))"
+  Expect (Invoke-Api PUT "/guest/sessions/$($anna.sessionId)/allergies" @{ allergies = 'Milk' } $anna.sessionToken) 409 'US13: guest cannot change after submit'
+
+  # ------------------------------------------------------------------ 8. US17: split the bill (simulated)
+  Step '8. US17  payment'
+  $r = Invoke-Api GET "/guest/groups/$groupId/payment" $null $ownerToken
+  Expect $r 200 'payment view after submit'
+  Check 'grand total = 79 (owner 19 + Anna 38 + Olena 22)' ([decimal]$r.Json.grandTotal -eq 79) "(got $($r.Json.grandTotal))"
+  $r = Invoke-Api PUT "/guest/groups/$groupId/payment" @{ mode = 'SplitEqually' } $ownerToken
+  $amounts = @($r.Json.participants | ForEach-Object { [decimal]$_.amount })
+  Check 'Split equally: 26.34 + 26.33 + 26.33 = 79' ((Sum-Of $amounts) -eq 79 -and $amounts[0] -eq 26.34) "(got $($amounts -join ', '))"
+  Expect (Invoke-Api PUT "/guest/groups/$groupId/payment" @{ mode = 'Crypto' } $ownerToken) 400 'unknown mode'
+  $r = Invoke-Api PUT "/guest/groups/$groupId/payment" @{ mode = 'EachPaysOwn' } $ownerToken
+  $annaPay = @($r.Json.participants) | Where-Object { $_.id -eq $anna.sessionId }
+  Check 'Each pays own: Anna pays 38' ([decimal]$annaPay.amount -eq 38) "(got $($annaPay.amount))"
+  Expect (Invoke-Api POST "/guest/groups/$groupId/payment/links" $null $ownerToken) 200 'send payment links'
+  $g = Invoke-Api GET "/guest/sessions/$($anna.sessionId)" $null $anna.sessionToken
+  Check 'Anna sees her share and the request' ([decimal]$g.Json.payment.amount -eq 38 -and @($g.Json.notices | Where-Object { $_.type -eq 'PaymentRequested' }).Count -ge 1) "(got $($g.Json.payment | ConvertTo-Json -Compress))"
+  $p = Invoke-Api POST "/guest/sessions/$($anna.sessionId)/pay" $null $anna.sessionToken
+  Check 'Anna pays (simulated)' ($p.Status -eq 200 -and $p.Json.isPaid -eq $true) "(got $($p.Status) $($p.Text))"
+  $r = Invoke-Api POST "/guest/groups/$groupId/payment/$ownerSessionId/paid" $null $ownerToken
+  Check 'owner marks own share paid: Paid 57 / Pending 22' ([decimal]$r.Json.paidTotal -eq 57 -and [decimal]$r.Json.pendingTotal -eq 22) "(got $($r.Json.paidTotal) / $($r.Json.pendingTotal))"
+  $r = Invoke-Api POST "/guest/groups/$groupId/reminders" @{ } $ownerToken
+  Check 'Remind at payment step: only Olena (unpaid)' (@($r.Json.reminded).Count -eq 1 -and @($r.Json.reminded)[0].id -eq $olena.sessionId) "(got $($r.Text))"
+  Expect (Invoke-Api GET "/guest/groups/$groupId/payment" $null $tokens.stranger) 403 'not the owner'
+
+  # ------------------------------------------------------------------ 9. US21: book again with the same group
+  Step '9. US21  book again'
+  $start2 = $start.AddDays(2)
+  $res2 = Require (Invoke-Api POST '/reservations' @{
+      tableId = $tableId; guestCount = 5
+      startTime = $start2.ToString('yyyy-MM-ddTHH:mm:ssZ'); endTime = $start2.AddMinutes(90).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    } $ownerToken) 200, 201 'second reservation'
+  $r = Invoke-Api POST "/reservations/$($res2.id)/rebook" @{ previousReservationId = $reservationId } $ownerToken
+  Expect $r 200 'link the new reservation to the previous group'
+  Check 'previous guests are invited (Anna, Olena, Iryna)' ([int]$r.Json.invitedParticipants -eq 3) "(got $($r.Text))"
+  $g = Invoke-Api GET "/guest/sessions/$($anna.sessionId)" $null $anna.sessionToken
+  Check 'Anna sees the new invite on her old link' ($g.Json.rebook.inviteToken -eq $r.Json.inviteToken) "(got $($g.Json.rebook | ConvertTo-Json -Compress))"
+  Expect (Invoke-Api POST "/reservations/$($res2.id)/rebook" @{ previousReservationId = $reservationId } $tokens.stranger) 403 'not the owner'
+  Expect (Invoke-Api POST "/reservations/$($res2.id)/rebook" @{ } $ownerToken) 400 'missing previousReservationId'
+
+  # ------------------------------------------------------------------ 10. US13: automatic send at the cut-off
+  Step '10. US13  automatic send after the cut-off'
+  $soon = (Get-Date).ToUniversalTime().AddMinutes(100)
+  $soon = $soon.AddSeconds(-$soon.Second)
+  $res3 = Require (Invoke-Api POST '/reservations' @{
+      tableId = $tableId; guestCount = 3
+      startTime = $soon.ToString('yyyy-MM-ddTHH:mm:ssZ'); endTime = $soon.AddMinutes(60).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    } $ownerToken) 200, 201 'reservation in 100 minutes (cut-off already passed)'
+  $null = Require (Invoke-Api POST '/orders' @{ reservationId = $res3.id; orderItems = @(@{ dishId = $soup; quantity = 1 }) } $ownerToken) 200, 201 'owner pre-order'
+  $inv3 = Require (Invoke-Api GET "/reservations/$($res3.id)/invite-token" $null $ownerToken) 200 'invite token'
+  $guestOpen = Invoke-Api GET "/guest/invites/$($inv3.token)"
+  Check 'a guest cannot join after the cut-off' ($guestOpen.Status -ne 200) "(got $($guestOpen.Status))"
+  $grp3 = Require (Invoke-Api GET "/guest/invites/$($inv3.token)" $null $ownerToken) 200 'owner opens the group'
+  $r = Invoke-Api GET "/guest/groups/$($grp3.groupReservationId)/sessions" $null $ownerToken
+  Check 'sent automatically and locked' ($r.Json.groupStatus -eq 'Submitted' -and $r.Json.submittedAutomatically -eq $true -and $r.Json.isLocked -eq $true) "(got $($r.Json.groupStatus), $($r.Json.submittedAutomatically))"
+  $order3 = Invoke-Api GET "/orders/$($res3.id)" $null $ownerToken
+  Check 'order went to the restaurant' (@('SubmittedByCustomer', '3', 3) -contains $order3.Json.status) "(got $($order3.Json.status))"
 }
 catch {
   $script:Failed++

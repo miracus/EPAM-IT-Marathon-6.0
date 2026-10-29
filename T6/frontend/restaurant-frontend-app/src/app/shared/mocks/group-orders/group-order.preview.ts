@@ -3,8 +3,8 @@ import { GroupSessionsResponse } from '@app/models/group-orders/group-sessions-r
 import { DEMO_INVITE, DEMO_OWNER_SESSION_ID, GroupOrdersMockStore } from './group-orders.mock-store';
 
 /**
- * Статичні дані для РІВНЯ 1 (верстка): імпортуй у сторінку замість HTTP.
- * Ті самі дані, що віддає мок-бекенд, тож на рівні 2 екран виглядатиме так само.
+ * Static data for LEVEL 1 (layout): import it into the page instead of HTTP.
+ * The same data the mock backend returns, so at level 2 the screen looks the same.
  */
 export const GROUP_ORDER_PREVIEW: {
   invite: GuestInvite;

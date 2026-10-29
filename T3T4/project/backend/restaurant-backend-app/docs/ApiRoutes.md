@@ -1260,3 +1260,41 @@ Response: 200 OK
   "message": "Notices acknowledged."
 }
 ```
+
+## Group pre-order extensions (US13–US21)
+
+Owner endpoints need the Cognito id token of the reservation owner; guest endpoints need the guest session token (`Authorization: Bearer {sessionToken}`).
+Errors: 400 validation · 401 no/invalid token · 403 not the owner · 404 not found · 409 group already sent or closed.
+
+**Cut-off (US13).** Changes close `GROUP_CUTOFF_HOURS` (default 2) hours before the reservation. Every read or write of a group checks the cut-off: once it has passed, the pre-order is sent automatically (submitted carts only, unavailable dishes skipped) and the group is locked. 30 minutes before the cut-off guests without dishes get an automatic reminder unless auto-remind is off (US14).
+The owner snapshot (`GET /guest/groups/{id}/sessions`) and the guest session (`GET /guest/sessions/{id}`) now include `cutoffAt`, `secondsUntilCutoff`, `isLocked`; the snapshot also has `submittedAt`, `submittedAutomatically`, `autoRemind`, `paymentMode`, `maxGuests`, `reservationStatus`, and every participant has `allergies`, `changedByOwner`, `lastRemindedAt`, `isPaid`. Items carry `note` and the effective `serveTime` (`OnArrival` / `AfterMains`, desserts default to `AfterMains`).
+
+### Owner
+
+| Method | Path | Body | Returns | Story |
+|---|---|---|---|---|
+| `POST` | /guest/groups/{groupReservationId}/sessions/{guestSessionId}/dishes/{dishId}/restore | `{ "quantity": 1, "note": "...", "serveTime": "OnArrival" }` | snapshot | US15 Undo |
+| `POST` | /guest/groups/{groupReservationId}/sessions/{guestSessionId}/change-request | — | snapshot | US15 "Ask to change order" |
+| `POST` | /guest/groups/{groupReservationId}/reminders | `{ "guestSessionIds": [] }` (optional) | `{ reminded, skipped }` | US14 |
+| `PUT` | /guest/groups/{groupReservationId}/settings | `{ "autoRemind": false }` | snapshot | US14 AC3 |
+| `PUT` | /guest/groups/{groupReservationId}/my-dishes/{dishId} | `{ "note": "...", "serveTime": "AfterMains" }` | snapshot | US18/US19 |
+| `PUT` | /guest/groups/{groupReservationId}/my-allergies | `{ "allergies": "Nuts" }` | snapshot | US18 |
+| `GET` | /guest/groups/{groupReservationId}/payment | — | payment view | US17 |
+| `PUT` | /guest/groups/{groupReservationId}/payment | `{ "mode": "EachPaysOwn" \| "OwnerPaysAll" \| "SplitEqually" }` | payment view | US17 |
+| `POST` | /guest/groups/{groupReservationId}/payment/links | — | payment view | US17 AC4 |
+| `POST` | /guest/groups/{groupReservationId}/payment/{guestSessionId}/paid | — | payment view | US17 |
+| `POST` | /reservations/{reservationId}/rebook | `{ "previousReservationId": "..." }` | `{ groupReservationId, inviteToken, invitedParticipants }` | US21 |
+
+Payment view: `{ mode, participants: [{ id, type, name, ownDishesTotal, amount, isPaid, paidAt, linkSentAt }], grandTotal, paidTotal, pendingTotal }`. Payments are simulated: nothing is charged.
+
+### Guest
+
+| Method | Path | Body | Story |
+|---|---|---|---|
+| `PUT` | /guest/sessions/{guestSessionId}/dishes/{dishId} | `{ "note": "...", "serveTime": "AfterMains" }` (empty note clears it) | US18/US19 |
+| `PUT` | /guest/sessions/{guestSessionId}/allergies | `{ "allergies": "Nuts" }` | US18 |
+| `POST` | /guest/sessions/{guestSessionId}/reopen | — | US16 "Pick another dish" |
+| `POST` | /guest/sessions/{guestSessionId}/pay | — | US17 (simulated) |
+| `GET` | /guest/groups/{groupReservationId}/status?guestSessionId={id} | — | US16 AC5: `removed: true` when the owner removed this guest |
+
+`GET /guest/sessions/{guestSessionId}` also returns `allergies`, `groupStatus`, `ownerName`, typed `notices` (`DishRemoved`, `Reminder`, `ChangeRequested`, `PaymentRequested` with `dishName`, `oldTotal`, `newTotal`, `amount`), `payment` (the guest's share) and `rebook` (`inviteToken`, `startTime`, `endTime` of the new reservation, US21).

@@ -1,0 +1,28 @@
+<section class="kitchen" aria-label="Pre-order by dish">
+  @for (allergy of view().allergies; track allergy.name) {
+    <p class="allergy-banner" role="note">
+      <strong>{{ allergy.allergies }}</strong> — {{ allergy.name }}. Kitchen will be warned.
+    </p>
+  }
+
+  @if (view().sections.length === 0) {
+    <p class="empty">No submitted carts yet — nothing will be sent to the restaurant.</p>
+  }
+
+  @for (section of view().sections; track section.serveTime) {
+    <h3 class="section-title">{{ section.label }}</h3>
+    <ul class="lines">
+      @for (line of section.lines; track line.dishId) {
+        <li class="line">
+          <div class="line-main">
+            <span>{{ line.name }} × {{ line.quantity }}</span>
+            <span class="price">{{ line.total | currency }}</span>
+          </div>
+          @for (note of line.notes; track $index) {
+            <p class="note">“{{ note.note }}” — {{ note.author }}</p>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -48,6 +48,7 @@ using APIHandler.Services.Reports.Interfaces;
 using APIHandler.Services.Reservations;
 using APIHandler.Services.Tables;
 using APIHandler.Services.Waiters;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
 
@@ -114,6 +115,7 @@ public static class RouteRegistry
         services.AddSingleton<IGuestSessionService, GuestSessionService>();
         services.AddSingleton<IGuestAuthorizationService, GuestAuthorizationService>();
         services.AddSingleton<IGroupPreOrderService, GroupPreOrderService>();
+        services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IReportService, ReportService>();
 
         var provider = services.BuildServiceProvider();
@@ -203,7 +205,26 @@ public static class RouteRegistry
             new RouteHandler(new Route(HttpMethods.GET, "/reservations/{reservationId}/guest-session-id"), ActivatorUtilities.CreateInstance<GetOwnerGuestSessionIdHandler>(provider)),
             new RouteHandler(new Route(HttpMethods.POST, "/group-reservations/{groupReservationId}/submit"), ActivatorUtilities.CreateInstance<SubmitGroupPreOrderHandler>(provider)),
             new RouteHandler(new Route(HttpMethods.DELETE, "/guest/groups/{groupReservationId}/sessions/{guestSessionId}/dishes/{dishId}"), ActivatorUtilities.CreateInstance<RemoveGuestDishByOwnerHandler>(provider)),
-            new RouteHandler(new Route(HttpMethods.POST, "/guest/sessions/{guestSessionId}/notices/ack"), ActivatorUtilities.CreateInstance<AcknowledgeGuestNoticesHandler>(provider))
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/sessions/{guestSessionId}/notices/ack"), ActivatorUtilities.CreateInstance<AcknowledgeGuestNoticesHandler>(provider)),
+
+            // Group pre-order extensions US13–US21 — owner side (Cognito)
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/groups/{groupReservationId}/sessions/{guestSessionId}/dishes/{dishId}/restore"), ActivatorUtilities.CreateInstance<RestoreGuestDishHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/groups/{groupReservationId}/sessions/{guestSessionId}/change-request"), ActivatorUtilities.CreateInstance<RequestGuestChangeHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/groups/{groupReservationId}/reminders"), ActivatorUtilities.CreateInstance<SendGroupRemindersHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.PUT, "/guest/groups/{groupReservationId}/settings"), ActivatorUtilities.CreateInstance<UpdateGroupSettingsHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.PUT, "/guest/groups/{groupReservationId}/my-dishes/{dishId}"), ActivatorUtilities.CreateInstance<UpdateOwnerDishHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.PUT, "/guest/groups/{groupReservationId}/my-allergies"), ActivatorUtilities.CreateInstance<UpdateOwnerAllergiesHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.GET, "/guest/groups/{groupReservationId}/payment"), ActivatorUtilities.CreateInstance<GetGroupPaymentHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.PUT, "/guest/groups/{groupReservationId}/payment"), ActivatorUtilities.CreateInstance<SetPaymentModeHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/groups/{groupReservationId}/payment/links"), ActivatorUtilities.CreateInstance<SendPaymentLinksHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/groups/{groupReservationId}/payment/{guestSessionId}/paid"), ActivatorUtilities.CreateInstance<MarkParticipantPaidHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.POST, "/reservations/{reservationId}/rebook"), ActivatorUtilities.CreateInstance<RebookReservationHandler>(provider)),
+
+            // Group pre-order extensions — guest side (guest session token)
+            new RouteHandler(new Route(HttpMethods.PUT, "/guest/sessions/{guestSessionId}/dishes/{dishId}"), ActivatorUtilities.CreateInstance<UpdateGuestDishDetailsHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.PUT, "/guest/sessions/{guestSessionId}/allergies"), ActivatorUtilities.CreateInstance<UpdateGuestAllergiesHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/sessions/{guestSessionId}/reopen"), ActivatorUtilities.CreateInstance<ReopenGuestCartHandler>(provider)),
+            new RouteHandler(new Route(HttpMethods.POST, "/guest/sessions/{guestSessionId}/pay"), ActivatorUtilities.CreateInstance<PayGuestShareHandler>(provider))
         ];
         List<RouteHandler> GetAuxiliaryRoutes() => [
             new RouteHandler(new Route(HttpMethods.GET, "/feedback"), ActivatorUtilities.CreateInstance<GetFeedbackForLocationHandler>(provider)),

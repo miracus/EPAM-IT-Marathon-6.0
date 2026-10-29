@@ -1,0 +1,106 @@
+@use 'app/shared/styles/abstracts/colors' as color;
+
+.payment {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background-color: color.$neutral-0;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.hint {
+  color: color.$neutral-600;
+  font-size: 14px;
+}
+
+.modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.mode {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid color.$neutral-200;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &--active {
+    border-color: color.$green-600;
+    background-color: color.$green-100;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color.$orange-400;
+  }
+}
+
+.mode-title {
+  font-weight: 500;
+}
+
+.mode-hint {
+  color: color.$neutral-600;
+  font-size: 13px;
+}
+
+.rows {
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 140px 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid color.$neutral-100;
+}
+
+.amount {
+  font-weight: 500;
+}
+
+.status {
+  color: color.$orange-600;
+
+  &--paid {
+    color: color.$green-600;
+  }
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  color: color.$green-600;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.totals {
+  font-size: 16px;
+}
+
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

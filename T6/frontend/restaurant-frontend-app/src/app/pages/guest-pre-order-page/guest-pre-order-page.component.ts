@@ -1,8 +1,9 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { interval, map } from 'rxjs';
+import { DatePipe } from '@angular/common';
 
 import { DishListResponse } from '@app/models/dishes/dish-list-response.model';
 import { GuestMenuDish } from '@app/services/guest-sessions/guest-sessions.service';
@@ -14,6 +15,11 @@ import { GuestPreorderStore } from './state/guest-preorder.store';
 import { GuestNameModalComponent } from './ui/guest-name-modal/guest-name-modal.component';
 import { GuestCartDrawerComponent } from './ui/guest-cart-drawer/guest-cart-drawer.component';
 import { GuestPreorderSubmittedComponent } from './ui/guest-preorder-submitted/guest-preorder-submitted.component';
+import { GuestNoticesComponent } from './ui/guest-notices/guest-notices.component';
+import { GuestNoteChange, GuestServeChange } from './ui/guest-cart-drawer/models';
+
+/** How often the guest screen re-reads the cart: owner changes, reminders, lock, payment (US13–US17). */
+const GUEST_SYNC_MS = 15_000;
 
 @Component({
     standalone: true,
@@ -26,13 +32,16 @@ import { GuestPreorderSubmittedComponent } from './ui/guest-preorder-submitted/g
         MainCoverImageComponent,
         GuestNameModalComponent,
         GuestCartDrawerComponent,
-        GuestPreorderSubmittedComponent
+        GuestPreorderSubmittedComponent,
+        GuestNoticesComponent,
+        DatePipe,
     ],
 })
 export class GuestPreOrderPageComponent {
     private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
     private readonly toast = inject(ToastService);
+    private readonly destroyRef = inject(DestroyRef);
 
     readonly store = inject(GuestPreorderStore);
     readonly isCartOpen = signal(false);
@@ -75,11 +84,42 @@ export class GuestPreOrderPageComponent {
         });
 
         // Redirect only for an invite that the backend confirms is invalid or expired.
+        // A guest who already joined stays: they see their own order and the organizer's messages (US13 AC4).
         effect(() => {
-            if (this.store.inviteError() === 'expired') {
+            if (this.store.inviteError() === 'expired' && !this.store.hasStoredSession()) {
                 this.router.navigateByUrl('/guest-pre-order-expired');
             }
         });
+
+        interval(GUEST_SYNC_MS)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => {
+                if (this.store.hasStoredSession() && !this.store.removed()) {
+                    void this.store.syncSession();
+                }
+            });
+    }
+
+    // ---- US16/US18/US19
+
+    onNoteChange(change: GuestNoteChange): void {
+        void this.store.setNote(change.dishId, change.note);
+    }
+
+    onServeChange(change: GuestServeChange): void {
+        void this.store.setServeTime(change.dishId, change.serveTime);
+    }
+
+    onAllergiesChange(allergies: string): void {
+        void this.store.setAllergies(allergies);
+    }
+
+    /** "Pick another dish" / "Edit my order": back to the menu with an editable cart. */
+    async backToMenu(): Promise<void> {
+        if (await this.store.reopen()) {
+            this.closeCart();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }
 
     openCart() { this.isCartOpen.set(true); }

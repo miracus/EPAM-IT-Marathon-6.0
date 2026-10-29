@@ -36,3 +36,7 @@ _project_export.tgz
 
 # Local credentials created by seed scripts
 *.local.txt
+
+# Offline NuGet packages used to build the backend without nuget.org
+nuget-offline.zip
+nuget-offline/

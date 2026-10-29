@@ -1,0 +1,66 @@
+<div class="notices" aria-live="polite">
+  @if (store.isLocked()) {
+    <p class="notice notice--locked" role="status">
+      Order was sent — contact the organizer to change it.
+    </p>
+  }
+
+  @if (store.removedNotices().length) {
+    <section class="notice notice--changed" role="alert">
+      @for (notice of store.removedNotices(); track notice.id) {
+        <p><strong>{{ notice.actorName || organizer() }}</strong> removed <strong>{{ notice.dishName || 'a dish' }}</strong> from your order</p>
+      }
+      @if (removedTotals(); as totals) {
+        <p class="totals">Your total: <s>{{ totals.old | currency }}</s> → {{ totals.new | currency }}</p>
+      }
+      <div class="actions">
+        <button type="button" class="btn btn--primary" [disabled]="store.cartBusy()" (click)="acknowledge()">OK, got it</button>
+        @if (!store.isLocked()) {
+          <button type="button" class="btn" [disabled]="store.cartBusy()" (click)="pickAnotherDish()">Pick another dish</button>
+        }
+      </div>
+    </section>
+  }
+
+  @for (notice of store.messageNotices(); track notice.id) {
+    <section class="notice" [class.notice--payment]="notice.type === 'PaymentRequested'" role="status">
+      <p>{{ notice.message }}</p>
+      @if (notice.type === 'Reminder' && store.cutoffAt() && store.timeLeft()) {
+        <p class="muted">Changes close at {{ store.cutoffAt() | date: 'HH:mm' }} · {{ store.timeLeft() }}</p>
+      }
+      <div class="actions">
+        <button type="button" class="btn" [disabled]="store.cartBusy()" (click)="acknowledge()">OK</button>
+      </div>
+    </section>
+  }
+
+  @if (store.payment(); as share) {
+    @if (share.amount > 0) {
+      <section class="notice notice--payment" aria-label="Your share">
+        <p>
+          Your share: <strong>{{ share.amount | currency }}</strong> ({{ paymentModeLabel() }})
+          @if (share.isPaid) {
+            — <strong class="paid">Paid</strong>
+          }
+        </p>
+        @if (!share.isPaid) {
+          <div class="actions">
+            <button type="button" class="btn btn--primary" [disabled]="store.cartBusy()" (click)="pay()">Pay now (demo)</button>
+          </div>
+        }
+      </section>
+    }
+  }
+
+  @if (store.rebook(); as next) {
+    <section class="notice notice--rebook">
+      <p>
+        <strong>{{ organizer() }}</strong> booked again with the same group for
+        {{ next.startTime | date: 'MMM d, HH:mm' }}.
+      </p>
+      <div class="actions">
+        <button type="button" class="btn btn--primary" (click)="joinNew(next.inviteToken)">Join the new pre-order</button>
+      </div>
+    </section>
+  }
+</div>

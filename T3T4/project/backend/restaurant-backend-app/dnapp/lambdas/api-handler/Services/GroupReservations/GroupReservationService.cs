@@ -8,6 +8,7 @@ using APIHandler.Repositories.GuestSessions;
 using APIHandler.Repositories.Reservations;
 using APIHandler.Repositories.Tables;
 using APIHandler.Services.Auth;
+using APIHandler.Services.GuestSessions;
 using APIHandler.Services.Locations;
 using System;
 using System.Threading.Tasks;
@@ -20,7 +21,8 @@ public class GroupReservationService(
     IReservationRepository reservationRepository,
     IGuestSessionRepository guestSessionRepository,
     IUserService userService,
-    ILocationService locationService) : IGroupReservationService
+    ILocationService locationService,
+    IGroupPreOrderService? groupPreOrderService = null) : IGroupReservationService
 {
     private const string DefaultRestaurantName = "Green & Tasty";
 
@@ -28,6 +30,14 @@ public class GroupReservationService(
     {
         GroupReservation groupReservation = await groupReservationRepository.GetGroupReservationByTokenAsync(token)
             ?? throw new GroupReservationNotFoundException();
+
+        // US13: after the cut-off the group is sent automatically, so guests can no longer join.
+        if (groupPreOrderService is not null && groupReservation.Status == GroupReservationStatus.Open)
+        {
+            await groupPreOrderService.EnforceCutoffAsync(groupReservation.GroupReservationId);
+            groupReservation = await groupReservationRepository.GetGroupReservationByIdAsync(groupReservation.GroupReservationId)
+                ?? groupReservation;
+        }
 
         // Anonymous caller (a guest): fail fast without loading the reservation.
         if (requesterId is null && groupReservation.Status != GroupReservationStatus.Open)

@@ -18,4 +18,14 @@ public class OrderItem
     [DynamoDBProperty("state", typeof(EnumAsIntConverter<OrderItemState>))]
     [JsonPropertyName("state")]
     public OrderItemState State { get; set; }
+
+    /// <summary>Note for the kitchen, up to 80 characters (US18).</summary>
+    [DynamoDBProperty("note")]
+    [JsonPropertyName("note")]
+    public string? Note { get; set; }
+
+    /// <summary>"OnArrival" or "AfterMains"; null means the default for the dish type (US19).</summary>
+    [DynamoDBProperty("serveTime")]
+    [JsonPropertyName("serveTime")]
+    public string? ServeTime { get; set; }
 }

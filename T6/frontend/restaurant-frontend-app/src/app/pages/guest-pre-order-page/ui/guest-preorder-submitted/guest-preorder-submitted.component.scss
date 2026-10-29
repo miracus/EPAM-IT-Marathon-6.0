@@ -145,3 +145,16 @@ h3 {
         line-height: 36px;
     }
 }
+
+.item-note {
+    display: block;
+    color: color.$neutral-600;
+    font-size: 13px;
+}
+
+.locked-note {
+    padding: 12px;
+    border-radius: 8px;
+    background-color: color.$orange-100;
+    text-align: center;
+}

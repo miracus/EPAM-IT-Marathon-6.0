@@ -17,6 +17,10 @@ export class GuestPreorderSubmittedComponent {
     readonly guestName = input('');
     readonly items = input<GuestCartItem[]>([]);
     readonly total = input(0);
+    /** US13: the order went to the restaurant — it can no longer be edited. */
+    readonly locked = input(false);
 
     readonly createNew = output<void>();
+    /** US16 AC3: edit the submitted cart again before the cut-off. */
+    readonly editOrder = output<void>();
 }

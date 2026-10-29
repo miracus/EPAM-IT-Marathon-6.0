@@ -22,7 +22,7 @@ export function consolidatePreOrder(participants: Participant[]): ConsolidatedOr
   for (const participant of participants.filter((person) => person.isSubmitted)) {
     for (const item of participant.items) {
       const existing = byDish.get(item.dish.id);
-      // завжди НОВИЙ об'єкт — вхідні дані не змінюються
+      // always a NEW object — the input data is not mutated
       byDish.set(item.dish.id, { dish: item.dish, quantity: (existing?.quantity ?? 0) + item.quantity });
     }
   }

@@ -29,8 +29,12 @@ public class GuestSessionService(
     IDishRepository dishRepository,
     IReservationRepository reservationRepository,
     IUserRepository userRepository,
-    ITableRepository tableRepository) : IGuestSessionService
+    ITableRepository tableRepository,
+    IGroupPreOrderService? groupPreOrderService = null,
+    TimeProvider? clock = null) : IGuestSessionService
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+
     public async Task<bool> IsAuthorizedAsync(string guestSessionToken, string guestSessionId)
     {
         // A malformed token is just an invalid token (401), not a server error.
@@ -161,8 +165,10 @@ public class GuestSessionService(
         await guestSessionRepository.SaveAsync(session);
     }
 
-    public async Task<GroupReservationStatusResponse> GetGroupReservationStatusAsync(string groupReservationId)
+    public async Task<GroupReservationStatusResponse> GetGroupReservationStatusAsync(string groupReservationId, string? guestSessionId = null)
     {
+        await EnforceCutoffAsync(groupReservationId);
+
         var group = await groupReservationRepository.GetGroupReservationByIdAsync(groupReservationId)
             ?? throw new GroupReservationNotFoundException();
 
@@ -170,13 +176,69 @@ public class GuestSessionService(
             ?? throw new InvalidOperationException("Associated reservation not found.");
 
         int currentParticipants = await GetCurrentParticipantCountAsync(groupReservationId);
+        DateTime now = _clock.GetUtcNow().UtcDateTime;
+        bool hasStartTime = reservation.StartTime != default;
 
         return new GroupReservationStatusResponse
         {
             CurrentParticipants = currentParticipants,
             MaxCapacity = reservation.GuestCount,
-            Status = group.Status
+            Status = group.Status,
+            Removed = guestSessionId is not null && (group.RemovedSessionIds?.Contains(guestSessionId) ?? false),
+            CutoffAt = hasStartTime ? GroupPreOrderRules.CutoffAt(reservation) : null,
+            SecondsUntilCutoff = hasStartTime ? GroupPreOrderRules.SecondsUntilCutoff(reservation, now) : 0,
+            IsLocked = group.Status != GroupReservationStatus.Open
+                || (hasStartTime && GroupPreOrderRules.IsCutoffPassed(reservation, now)),
         };
+    }
+
+    // ---------------------------------------------------------------- US18/US19: notes, serving time, allergies
+
+    public async Task UpdateDishDetailsAsync(string guestSessionId, string dishId, string? note, string? serveTime)
+    {
+        string? normalizedNote = GroupPreOrderService.NormalizeText(note, GroupPreOrderRules.NoteMaxLength, "Note");
+        string? normalizedServeTime = GroupPreOrderService.NormalizeServeTime(serveTime);
+
+        // Notes and serving times do not change totals, so they can be edited after the guest submitted the cart.
+        GuestSession session = await GetSessionInOpenGroupAsync(guestSessionId);
+
+        OrderItem item = (session.Dishes ?? []).FirstOrDefault(d => d.DishId == dishId)
+            ?? throw new DishNotFoundException($"Dish {dishId} not found in guest session.");
+
+        GroupPreOrderService.ApplyDetails(item, normalizedNote, normalizedServeTime);
+        await guestSessionRepository.SaveAsync(session);
+    }
+
+    public async Task UpdateAllergiesAsync(string guestSessionId, string? allergies)
+    {
+        string? normalized = GroupPreOrderService.NormalizeText(allergies ?? string.Empty, GroupPreOrderRules.AllergiesMaxLength, "Allergies");
+
+        GuestSession session = await GetSessionInOpenGroupAsync(guestSessionId);
+        session.Allergies = string.IsNullOrEmpty(normalized) ? null : normalized;
+        await guestSessionRepository.SaveAsync(session);
+    }
+
+    /// <summary>US16 AC3 "Pick another dish": the guest edits a submitted cart again (before the cut-off).</summary>
+    public async Task ReopenCartAsync(string guestSessionId)
+    {
+        GuestSession session = await GetSessionInOpenGroupAsync(guestSessionId);
+        if (!session.IsSubmitted)
+            return;
+
+        session.IsSubmitted = false;
+        await guestSessionRepository.SaveAsync(session);
+    }
+
+    /// <summary>US17: simulated payment of the guest's share.</summary>
+    public async Task<GuestPaymentShare> PayAsync(string guestSessionId)
+    {
+        var session = await guestSessionRepository.GetByGuestSessionId(guestSessionId)
+            ?? throw new GuestSessionNotFoundException("Guest session was not found.");
+
+        if (groupPreOrderService is null)
+            throw new ValidationException("Payments are not available.");
+
+        return await groupPreOrderService.PayGuestShareAsync(session.GroupReservationId, guestSessionId);
     }
 
     
@@ -206,8 +268,26 @@ public class GuestSessionService(
         await guestSessionRepository.SaveAsync(guestSession);
     }
 
+    private async Task EnforceCutoffAsync(string groupReservationId)
+    {
+        // US13: after the cut-off the group is sent automatically and locked for everyone.
+        if (groupPreOrderService is not null && !string.IsNullOrWhiteSpace(groupReservationId))
+            await groupPreOrderService.EnforceCutoffAsync(groupReservationId);
+    }
+
+    private async Task<GuestSession> GetSessionInOpenGroupAsync(string sessionId)
+    {
+        var session = await guestSessionRepository.GetByGuestSessionId(sessionId)
+            ?? throw new GuestSessionNotFoundException($"Guest session {sessionId} not found.");
+
+        await ValidateGroupReservationId(session.GroupReservationId);
+        return session;
+    }
+
     private async Task<GroupReservation> GetGroupReservationAndValidateAsync(string groupReservationId)
     {
+        await EnforceCutoffAsync(groupReservationId);
+
         GroupReservation? group = await groupReservationRepository.GetGroupReservationByIdAsync(groupReservationId);
         ValidateGroupReservation(group);
         return group;
@@ -307,37 +387,107 @@ public class GuestSessionService(
         var session = await guestSessionRepository.GetByGuestSessionId(guestSessionId)
             ?? throw new GuestSessionNotFoundException("Guest session was not found.");
 
+        await EnforceCutoffAsync(session.GroupReservationId);
+
+        // Re-read: an automatic submit may have changed the session (owner snapshot) or the group.
+        session = await guestSessionRepository.GetByGuestSessionId(guestSessionId) ?? session;
+        session.Dishes ??= [];
+
         var dishIds = session.Dishes
             .Select(s => s.DishId)
             .Distinct()
             .ToArray();
 
-        var allDishes = await dishRepository.GetDishesByIdsAsync(dishIds);
-        var dishesById = allDishes.ToDictionary(d => d.Id);
+        IEnumerable<Dish> allDishes = dishIds.Length == 0 ? Array.Empty<Dish>() : await dishRepository.GetDishesByIdsAsync(dishIds);
+        var dishesById = allDishes
+            .GroupBy(d => d.Id)
+            .ToDictionary(g => g.Key, g => g.First());
 
-        var items = session.Dishes.Select(d => new OrderItemResponse
-        {
-            Dish = DishMapper.ToDishResponse(dishesById[d.DishId]),
-            Quantity = d.Quantity
-        }).ToArray();
+        // Dishes deleted from the menu are skipped instead of failing the whole cart.
+        var items = session.Dishes
+            .Where(d => dishesById.ContainsKey(d.DishId))
+            .Select(d => new OrderItemResponse
+            {
+                Dish = DishMapper.ToDishResponse(dishesById[d.DishId]),
+                Quantity = d.Quantity,
+                Note = d.Note,
+                ServeTime = d.ServeTime ?? GroupPreOrderRules.DefaultServeTime(dishesById[d.DishId].DishType),
+            })
+            .ToArray();
 
         decimal total = items.Sum(i => i.Quantity * i.Dish.Price);
 
-        string name = session.GuestName;
-        if (session.IsOwnerSession)
-        {
-            var groupReservation = await groupReservationRepository.GetGroupReservationByIdAsync(session.GroupReservationId);
-            var reservation = await reservationRepository.GetReservationByIdAsync(groupReservation!.ReservationId);
-            var user = await userRepository.GetUserByIdAsync(reservation!.CustomerId!);
-            name = user!.Attributes.First(a => a.Name == "given_name").Value;
-        }
+        GroupReservation? group = await groupReservationRepository.GetGroupReservationByIdAsync(session.GroupReservationId);
+        Reservation? reservation = group is null ? null : await reservationRepository.GetReservationByIdAsync(group.ReservationId);
+
+        string? ownerName = await GetUserFirstNameAsync(reservation?.CustomerId);
+        string name = session.IsOwnerSession ? ownerName ?? session.GuestName : session.GuestName;
+
+        DateTime now = _clock.GetUtcNow().UtcDateTime;
+        bool hasStartTime = reservation is not null && reservation.StartTime != default;
+
+        GuestPaymentShare? payment = group is not null && groupPreOrderService is not null
+            ? await groupPreOrderService.GetGuestPaymentShareAsync(group.GroupReservationId, session.Id)
+            : null;
 
         return new GetGuestSessionResponse(name, items, total, session.IsSubmitted)
         {
             Notices = (session.Notices ?? [])
-                .Select(n => new GuestNoticeResponse(n.Id, n.Message, n.DishId, n.CreatedAt))
+                .Select(n => new GuestNoticeResponse(n.Id, n.Message, n.DishId, n.CreatedAt)
+                {
+                    Type = n.Type ?? (n.DishId is null ? null : GuestNoticeTypes.DishRemoved),
+                    ActorName = n.ActorName,
+                    DishName = n.DishName,
+                    Quantity = n.Quantity,
+                    OldTotal = n.OldTotal,
+                    NewTotal = n.NewTotal,
+                    Amount = n.Amount,
+                })
                 .ToArray(),
+            Allergies = session.Allergies,
+            GroupStatus = group?.Status.ToString(),
+            CutoffAt = hasStartTime ? GroupPreOrderRules.CutoffAt(reservation!) : null,
+            SecondsUntilCutoff = hasStartTime ? GroupPreOrderRules.SecondsUntilCutoff(reservation!, now) : 0,
+            IsLocked = group is null
+                || group.Status != GroupReservationStatus.Open
+                || (hasStartTime && GroupPreOrderRules.IsCutoffPassed(reservation!, now)),
+            OwnerName = ownerName,
+            Payment = payment,
+            Rebook = group is null ? null : await GetRebookInfoAsync(group),
         };
+    }
+
+    /// <summary>US21 AC3: the organizer booked again — guests of the previous group get the new invite.</summary>
+    private async Task<RebookInfo?> GetRebookInfoAsync(GroupReservation group)
+    {
+        if (string.IsNullOrWhiteSpace(group.NextReservationId))
+            return null;
+
+        GroupReservation? next = await groupReservationRepository.GetByReservationIdAsync(group.NextReservationId);
+        if (next is null || next.Status != GroupReservationStatus.Open)
+            return null;
+
+        Reservation? nextReservation = await reservationRepository.GetReservationByIdAsync(next.ReservationId);
+        if (nextReservation is null || nextReservation.Status != ReservationStatus.Reserved)
+            return null;
+
+        return new RebookInfo(next.ReservationToken, nextReservation.StartTime, nextReservation.EndTime);
+    }
+
+    private async Task<string?> GetUserFirstNameAsync(string? userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return null;
+
+        try
+        {
+            var user = await userRepository.GetUserByIdAsync(userId);
+            return user?.Attributes?.FirstOrDefault(a => a.Name == "given_name")?.Value;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
 }

@@ -16,5 +16,14 @@ public class SubmitGroupPreOrderRequest
 /// <summary>One merged dish line returned by the group submit (homework L2).</summary>
 public record SubmittedDishResponse(string DishId, int Quantity);
 
-/// <summary>A change made by the owner that the guest should see (US16).</summary>
-public record GuestNoticeResponse(string Id, string Message, string? DishId, DateTime CreatedAt);
+/// <summary>A message for the guest: a change made by the owner (US16), a reminder (US14) or a payment request (US17).</summary>
+public record GuestNoticeResponse(string Id, string Message, string? DishId, DateTime CreatedAt)
+{
+    public string? Type { get; init; }
+    public string? ActorName { get; init; }
+    public string? DishName { get; init; }
+    public int? Quantity { get; init; }
+    public decimal? OldTotal { get; init; }
+    public decimal? NewTotal { get; init; }
+    public decimal? Amount { get; init; }
+}

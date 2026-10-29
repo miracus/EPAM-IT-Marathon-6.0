@@ -5,6 +5,14 @@ import { GuestInviteService } from '@app/services/reservation/guest-invite.servi
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
 import { GuestMenuDish } from '@app/services/guest-sessions/guest-sessions.service';
 import { GuestSessionsService } from '@app/services/guest-sessions/guest-sessions.service';
+import { ServeTime } from '@app/models/group-orders/participant.model';
+import {
+    GuestNotice,
+    GuestPaymentShare,
+    GuestRebook,
+    GuestSessionInfo,
+} from '@app/models/group-orders/guest-session.model';
+import { defaultServeTime, formatTimeLeft } from '@app/shared/helpers/group-pre-order';
 
 export type GuestPreorderStatus = 'active' | 'submitted';
 
@@ -24,6 +32,11 @@ export interface GuestCartItem {
     price: number;
     imageUrl?: string;
     qty: number;
+    /** US18: note for the kitchen. */
+    note?: string | null;
+    /** US19: serving time (the server fills in the default). */
+    serveTime?: ServeTime;
+    dishType?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -51,6 +64,19 @@ export class GuestPreorderStore {
     readonly cartBusy = signal(false);
     readonly cartError = signal<string | null>(null);
 
+    // ---- US13–US21: what the server says about this guest
+    readonly notices = signal<GuestNotice[]>([]);
+    readonly allergies = signal('');
+    readonly ownerName = signal<string | null>(null);
+    readonly isLocked = signal(false);
+    readonly groupStatus = signal<string | null>(null);
+    readonly payment = signal<GuestPaymentShare | null>(null);
+    readonly rebook = signal<GuestRebook | null>(null);
+    /** US16 AC5: the organizer removed this guest from the group. */
+    readonly removed = signal(false);
+    readonly cutoffAt = signal<string | null>(null);
+    private readonly cutoff = signal<{ seconds: number; receivedAt: number } | null>(null);
+
     readonly menuByCategory = signal<Record<string, GuestMenuDish[]>>({});
     readonly menuCategories = computed(() => Object.keys(this.menuByCategory()));
     readonly hasMenu = computed(() =>
@@ -61,13 +87,15 @@ export class GuestPreorderStore {
         this.cartItems().reduce((sum, i) => sum + i.price * i.qty, 0)
     );
 
+    /** US16 AC1/AC2: dishes the organizer removed (not yet acknowledged). */
+    readonly removedNotices = computed(() => this.notices().filter(n => n.type === 'DishRemoved'));
+    /** US14 / US15 AC4 / US17: other messages from the organizer. */
+    readonly messageNotices = computed(() => this.notices().filter(n => n.type !== 'DishRemoved'));
+
     constructor() {
         effect(() => {
             const ctx = this.contextId();
             if (!ctx) return;
-
-            // IMPORTANT: after submit do not persist anything
-            if (this.status() !== 'active') return;
 
             localStorage.setItem(this.key(ctx, 'guestName'), this.guestName());
             localStorage.setItem(this.key(ctx, 'cart'), JSON.stringify(this.cartItems()));
@@ -76,12 +104,16 @@ export class GuestPreorderStore {
         });
     }
 
+    /** The guest already joined on this device — the page must not redirect to "expired". */
+    hasStoredSession(): boolean {
+        return !!this.guestSessionId() && !!this.guestSessionToken();
+    }
+
     initContext(id: string) {
         if (!id) return;
         if (this.contextId() === id) return;
 
         this.contextId.set(id);
-        void this.loadInviteByToken(id);
 
         const name = localStorage.getItem(this.key(id, 'guestName'));
         const cartRaw = localStorage.getItem(this.key(id, 'cart'));
@@ -89,12 +121,26 @@ export class GuestPreorderStore {
         const sessionId = localStorage.getItem(this.key(id, 'guestSessionId'));
         const sessionToken = localStorage.getItem(this.key(id, 'guestSessionToken'));
 
-        if (sessionId) this.guestSessionId.set(sessionId);
-        if (sessionToken) this.guestSessionToken.set(sessionToken);
+        // A different invite (e.g. "Join the new pre-order", US21) starts from a clean state.
+        this.guestSessionId.set(sessionId || null);
+        this.guestSessionToken.set(sessionToken || null);
+        this.guestName.set('');
+        this.cartItems.set([]);
+        this.notices.set([]);
+        this.status.set('active');
+        this.isLocked.set(false);
+        this.payment.set(null);
+        this.rebook.set(null);
+        this.removed.set(false);
+        this.cutoff.set(null);
+        this.menuByCategory.set({});
 
-        // If guest was already joined on this device/browser, load menu automatically
+        void this.loadInviteByToken(id);
+
+        // If guest was already joined on this device/browser, load menu and the server cart automatically
         if (this.guestSessionId() && this.guestSessionToken()) {
             void this.loadMenu();
+            void this.syncSession();
         }
 
         if (name) this.guestName.set(name);
@@ -116,10 +162,18 @@ export class GuestPreorderStore {
         try {
             const inv = await firstValueFrom(this.guestInviteService.getInvite$(token));
             this.invite.set(inv);
+            localStorage.setItem(this.key(token, 'invite'), JSON.stringify(inv));
         } catch (error) {
-            this.invite.set(null);
+            // After the cut-off or submit the invite is closed for guests; a guest who already joined
+            // still sees their own order with the details remembered on this device (US13 AC4).
+            const cached = this.readCachedInvite(token);
+            this.invite.set(cached);
             const status = error instanceof HttpErrorResponse ? error.status : null;
-            this.inviteError.set(status === 404 || status === 410 ? 'expired' : 'retryable');
+            if (cached && this.hasStoredSession()) {
+                this.inviteError.set(null);
+            } else {
+                this.inviteError.set(status === 404 || status === 410 ? 'expired' : 'retryable');
+            }
         } finally {
             this.inviteLoading.set(false);
         }
@@ -145,8 +199,6 @@ export class GuestPreorderStore {
             guestName: this.guestName(),
         };
 
-        console.log('[join payload]', payload);
-
         this.joinLoading.set(true);
         this.joinError.set(null);
 
@@ -155,8 +207,8 @@ export class GuestPreorderStore {
             this.guestSessionId.set(res.SessionId);
             this.guestSessionToken.set(res.SessionToken);
             await this.loadMenu();
-        } catch (e) {
-            console.log('[join error]', e);
+            await this.syncSession();
+        } catch {
             this.joinError.set('Failed to join session');
         } finally {
             this.joinLoading.set(false);
@@ -200,6 +252,12 @@ export class GuestPreorderStore {
         return `You are making a pre-order for the reservation ${parts.join(', ')}`;
     });
 
+    /** US13 AC1: "in 1h 20m" from the server value; refreshed with every sync. */
+    readonly timeLeft = computed(() => {
+        const cutoff = this.cutoff();
+        return cutoff ? formatTimeLeft(cutoff.seconds) : null;
+    });
+
     async loadMenu() {
         const id = this.guestSessionId();
         const token = this.guestSessionToken();
@@ -210,16 +268,68 @@ export class GuestPreorderStore {
 
         try {
             const res = await firstValueFrom(this.guestSessionsService.getMenu(id, token));
-            console.log('[menu response]', res);
-            console.log('[menu dishes keys]', Object.keys(res.dishes ?? {}));
-
             this.menuByCategory.set(res.dishes ?? {});
-        } catch (e) {
-            console.log('[menu error]', e);
+        } catch {
             this.menuError.set('Failed to load menu');
             this.menuByCategory.set({});
         } finally {
             this.menuLoading.set(false);
+        }
+    }
+
+    /**
+     * The server is the source of truth for the cart: the organizer may have removed a dish (US16),
+     * asked for a change (US15), sent the order at the cut-off (US13) or asked for payment (US17).
+     */
+    async syncSession(): Promise<void> {
+        const id = this.guestSessionId();
+        const token = this.guestSessionToken();
+        if (!id || !token) return;
+
+        try {
+            const info = await firstValueFrom(this.guestSessionsService.getSession(id, token));
+            this.applySession(info);
+        } catch (error) {
+            const status = error instanceof HttpErrorResponse ? error.status : null;
+            if (status === 401 || status === 404) {
+                await this.checkRemoved(id);
+            }
+        }
+    }
+
+    private applySession(info: GuestSessionInfo): void {
+        if (info.name) this.guestName.set(info.name);
+        this.cartItems.set(info.items.map(item => ({
+            dishId: item.dish.id,
+            title: item.dish.name,
+            price: item.dish.price,
+            imageUrl: item.dish.imageUrl ?? undefined,
+            qty: item.quantity,
+            note: item.note ?? null,
+            serveTime: item.serveTime ?? defaultServeTime(item.dish.dishType),
+            dishType: item.dish.dishType,
+        })));
+        this.status.set(info.isSubmitted ? 'submitted' : 'active');
+        this.notices.set(info.notices ?? []);
+        this.allergies.set(info.allergies ?? '');
+        this.ownerName.set(info.ownerName ?? null);
+        this.isLocked.set(!!info.isLocked);
+        this.groupStatus.set(info.groupStatus ?? null);
+        this.payment.set(info.payment ?? null);
+        this.rebook.set(info.rebook ?? null);
+        this.cutoffAt.set(info.cutoffAt ?? null);
+        this.cutoff.set(info.cutoffAt ? { seconds: info.secondsUntilCutoff ?? 0, receivedAt: Date.now() } : null);
+        this.removed.set(false);
+    }
+
+    private async checkRemoved(guestSessionId: string): Promise<void> {
+        const groupId = (this.invite() ?? this.readCachedInvite(this.contextId() ?? ''))?.GroupReservationId;
+        if (!groupId) return;
+        try {
+            const status = await firstValueFrom(this.guestSessionsService.getGroupStatus(groupId, guestSessionId));
+            this.removed.set(!!status.removed);
+        } catch {
+            // keep the last known state
         }
     }
 
@@ -264,6 +374,82 @@ export class GuestPreorderStore {
         });
     }
 
+    // ---- US18/US19
+
+    async setNote(dishId: string, note: string): Promise<void> {
+        await this.runGuestAction(
+            (id, token) => this.guestSessionsService.updateDish(id, token, dishId, { note: note.trim() }),
+            'Could not save the note. Please try again.',
+        );
+    }
+
+    async setServeTime(dishId: string, serveTime: ServeTime): Promise<void> {
+        await this.runGuestAction(
+            (id, token) => this.guestSessionsService.updateDish(id, token, dishId, { serveTime }),
+            'Could not change the serving time. Please try again.',
+        );
+    }
+
+    async setAllergies(allergies: string): Promise<void> {
+        await this.runGuestAction(
+            (id, token) => this.guestSessionsService.updateAllergies(id, token, allergies.trim()),
+            'Could not save allergies. Please try again.',
+        );
+    }
+
+    // ---- US16
+
+    async acknowledgeNotices(): Promise<void> {
+        await this.runGuestAction(
+            (id, token) => this.guestSessionsService.acknowledgeNotices(id, token),
+            'Could not update. Please try again.',
+        );
+    }
+
+    /** "Pick another dish": a submitted cart becomes editable again (before the cut-off). */
+    async reopen(): Promise<boolean> {
+        if (this.status() !== 'submitted') return true;
+        return this.runGuestAction(
+            (id, token) => this.guestSessionsService.reopen(id, token),
+            'The order can no longer be changed.',
+        );
+    }
+
+    // ---- US17
+
+    async pay(): Promise<boolean> {
+        return this.runGuestAction(
+            (id, token) => this.guestSessionsService.pay(id, token),
+            'Payment failed. Please try again.',
+        );
+    }
+
+    /** Calls a guest endpoint, then reloads the session from the server. */
+    private async runGuestAction(
+        request: (id: string, token: string) => ReturnType<GuestSessionsService['reopen']>,
+        errorMessage: string,
+    ): Promise<boolean> {
+        const sessionId = this.guestSessionId();
+        const token = this.guestSessionToken();
+        if (!sessionId || !token) {
+            this.cartError.set('Your guest session has expired. Please rejoin the reservation.');
+            return false;
+        }
+
+        this.cartBusy.set(true);
+        this.cartError.set(null);
+        try {
+            await firstValueFrom(request(sessionId, token));
+            await this.syncSession();
+            return true;
+        } catch {
+            this.cartError.set(errorMessage);
+            return false;
+        } finally {
+            this.cartBusy.set(false);
+        }
+    }
+
     async submitPreorder() {
         const sessionId = this.guestSessionId();
         const token = this.guestSessionToken();
@@ -287,10 +473,8 @@ export class GuestPreorderStore {
 
     // call this only after API submit success
     submitSuccess() {
+        // The session is kept: the guest can come back to the link and see changes made by the organizer (US16).
         this.status.set('submitted');
-
-        const ctx = this.contextId();
-        if (ctx) this.clearStorage(ctx);
     }
 
     async createNewPreorder() {
@@ -309,6 +493,7 @@ export class GuestPreorderStore {
         this.menuError.set(null);
         this.menuLoading.set(true);
         this.cartItems.set([]);
+        this.notices.set([]);
         this.status.set('active');
         this.joinLoading.set(true);
 
@@ -350,25 +535,32 @@ export class GuestPreorderStore {
                 : this.guestSessionsService.removeDish(sessionId, token, dishId, quantity);
             await firstValueFrom(request);
             updateLocalCart();
+            void this.syncSession();
             return true;
-        } catch {
-            this.cartError.set('Could not update your cart. Please try again.');
+        } catch (error) {
+            const status = error instanceof HttpErrorResponse ? error.status : null;
+            this.cartError.set(status === 409
+                ? 'The order was sent to the restaurant — contact the organizer to change it.'
+                : 'Could not update your cart. Please try again.');
+            if (status === 409) void this.syncSession();
             return false;
         } finally {
             this.cartBusy.set(false);
         }
     }
 
-    private clearStorage(ctx: string) {
-        localStorage.removeItem(this.key(ctx, 'guestName'));
-        localStorage.removeItem(this.key(ctx, 'cart'));
-        localStorage.removeItem(this.key(ctx, 'status'));
-        // cleanup legacy
+    private readCachedInvite(token: string): GuestInvite | null {
+        try {
+            const raw = localStorage.getItem(this.key(token, 'invite'));
+            return raw ? (JSON.parse(raw) as GuestInvite) : null;
+        } catch {
+            return null;
+        }
     }
 
     private key(
         ctx: string,
-        part: 'guestName' | 'cart' | 'status' | 'guestSessionId' | 'guestSessionToken'
+        part: 'guestName' | 'cart' | 'status' | 'guestSessionId' | 'guestSessionToken' | 'invite'
     ) {
         return `guestPreorder:${ctx}:${part}`;
     }
