@@ -66,8 +66,11 @@ if ($locations.Count -eq 0) { Write-Host '  Nothing to clean up.' -ForegroundCol
 # A dish is removed only if no real (non-test) location uses it.
 $allLocations = @((Invoke-Aws @('dynamodb', 'scan', '--table-name', 'Locations')).Items)
 $testIds = @($locations | ForEach-Object { $_.id.S })
-$keepDishIds = @($allLocations | Where-Object { $testIds -notcontains $_.id.S } |
-  ForEach-Object { @($_.specialtyDishIds.L) | ForEach-Object { $_.S } })
+# The .NET SDK may store the list as a string set (SS) or as a list (L) - read both.
+function Get-SpecialtyIds($location) {
+  @($location.specialtyDishIds.SS) + @(@($location.specialtyDishIds.L) | ForEach-Object { $_.S }) | Where-Object { $_ }
+}
+$keepDishIds = @($allLocations | Where-Object { $testIds -notcontains $_.id.S } | ForEach-Object { Get-SpecialtyIds $_ })
 $dishIds = New-Object System.Collections.Generic.HashSet[string]
 
 foreach ($location in $locations) {
@@ -76,7 +79,7 @@ foreach ($location in $locations) {
   Add-Key 'Locations' @{ id = @{ S = $locationId } }
 
   foreach ($dish in Get-ByScan 'Dishes' 'locationId' $locationId) { [void]$dishIds.Add($dish.id.S) }
-  foreach ($specialty in @($location.specialtyDishIds.L)) { if ($specialty.S) { [void]$dishIds.Add($specialty.S) } }
+  foreach ($specialtyId in Get-SpecialtyIds $location) { [void]$dishIds.Add($specialtyId) }
   foreach ($waiter in Get-ByKey 'Waiters' 'locationId-index' 'locationId' $locationId) { Add-Key 'Waiters' @{ userId = $waiter.userId } }
 
   foreach ($table in Get-ByKey 'Tables' 'locationId-tableNumber-index' 'locationId' $locationId) {
@@ -105,6 +108,7 @@ foreach ($dishId in $dishIds) {
 }
 
 Write-Host "`nFound:" -ForegroundColor Cyan
+if (-not ($toDelete | Where-Object Table -eq 'Dishes')) { Write-Host '  (no test dishes found)' -ForegroundColor DarkGray }
 $toDelete | Group-Object Table | Sort-Object Name | ForEach-Object { Write-Host ("  {0,-18} {1}" -f $_.Name, $_.Count) }
 
 if (-not $Delete) {
