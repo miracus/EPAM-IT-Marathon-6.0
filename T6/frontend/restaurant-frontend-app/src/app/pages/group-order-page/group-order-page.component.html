@@ -55,17 +55,57 @@
       }
 
       @case ('ready') {
+        @if (isCompleted()) {
+          <!-- US21 AC1: summary of a completed reservation -->
+          <section class="completed" aria-labelledby="completed-title">
+            <h2 id="completed-title" class="section-title">Your visit</h2>
+            <p>
+              {{ invite()?.StartTime | date: 'MMM d, y' }} · {{ invite()?.LocationAddress }} ·
+              {{ completedSummary().people }} people · {{ completedSummary().dishes }} dishes ·
+              {{ completedSummary().total | currency }}
+            </p>
+            <button type="button" class="button button--primary button--large" (click)="bookAgain()">Book again with same group</button>
+          </section>
+        }
+
         @if (isOpen()) {
           <div class="sync" aria-live="polite">
             @if (refreshFailed()) {
               <span class="sync-text sync-text--failed">
-                Couldn’t refresh. Showing data from {{ lastUpdated() | date: 'HH:mm:ss' }}
+                <span class="live-dot live-dot--off" aria-hidden="true"></span>
+                Offline · reconnecting… Couldn’t refresh. Showing data from {{ lastUpdated() | date: 'HH:mm:ss' }}
               </span>
             } @else {
-              <span class="sync-text">Updated at {{ lastUpdated() | date: 'HH:mm:ss' }}</span>
+              <span class="sync-text">
+                <span class="live-dot" aria-hidden="true"></span>
+                Live · Updated at {{ lastUpdated() | date: 'HH:mm:ss' }}
+              </span>
             }
             <button type="button" class="sync-button" [disabled]="refreshing()" (click)="refresh()">Refresh</button>
           </div>
+
+          <!-- US13 AC1, US14, US20 AC4: progress, cut-off, reminders -->
+          <div class="progress-row">
+            <span class="progress">{{ progress() }}</span>
+            @if (canEdit() && notChosen().length > 0) {
+              <button type="button" class="button button--secondary button--small" [disabled]="busy()" (click)="remindAll()">
+                Remind {{ notChosen().length }}
+              </button>
+            }
+          </div>
+          @if (meta().cutoffAt) {
+            <div class="cutoff-row">
+              @if (timeLeft(); as left) {
+                <span class="cutoff">Changes close at {{ meta().cutoffAt | date: 'HH:mm' }} · {{ left }}</span>
+              } @else {
+                <span class="cutoff cutoff--passed">Changes are closed — the pre-order is being sent</span>
+              }
+              <label class="auto-remind">
+                <input type="checkbox" [checked]="meta().autoRemind" [disabled]="busy() || !canEdit()" (change)="toggleAutoRemind($event)" />
+                Auto-remind 30 min before
+              </label>
+            </div>
+          }
 
           @if (inviteLink(); as link) {
             <section class="invite" aria-labelledby="invite-title">
@@ -95,20 +135,47 @@
         } @else if (status() === 'Submitted') {
           <p class="banner banner--sent" role="note">
             <img src="assets/svg/check-circle.svg" alt="" aria-hidden="true" width="20" height="20" />
-            The pre-order has been sent to the restaurant. Carts can no longer be changed.
+            @if (meta().submittedAt) {
+              Sent to the restaurant at {{ meta().submittedAt | date: 'HH:mm' }}{{ meta().submittedAutomatically ? ' automatically at the cut-off' : '' }}.
+            } @else {
+              The pre-order has been sent to the restaurant.
+            }
+            Carts can no longer be changed.
           </p>
         } @else {
           <p class="banner" role="note">This group pre-order is closed. Carts can no longer be changed.</p>
         }
 
+        <div class="view-tabs" role="tablist" aria-label="View">
+          <button type="button" role="tab" class="view-tab" [class.view-tab--active]="view() === 'guests'" [attr.aria-selected]="view() === 'guests'" (click)="setView('guests')">
+            By guest
+          </button>
+          <button type="button" role="tab" class="view-tab" [class.view-tab--active]="view() === 'dishes'" [attr.aria-selected]="view() === 'dishes'" (click)="setView('dishes')">
+            By dish ({{ dishCount() }})
+          </button>
+        </div>
+
+        @if (view() === 'dishes') {
+          <app-kitchen-view [participants]="participants()" />
+        } @else {
         <ul class="participants" aria-label="Participants">
           @for (person of participants(); track person.id) {
             <li>
               <app-participant-card
                 [participant]="person"
                 [isMe]="person.id === ownerSessionId()"
-                [canRemove]="isOpen() && person.type === 'Guest'"
+                [canRemove]="canEdit() && person.type === 'Guest'"
+                [canEdit]="canEdit()"
+                [locked]="!canEdit()"
+                [newKeys]="newKeys()"
+                [removedLines]="removedFor(person.id)"
                 (removeClick)="askRemove($event)"
+                (removeDish)="removeDish($event)"
+                (undo)="undoRemove($event)"
+                (remind)="remind($event)"
+                (askChange)="askChange($event)"
+                (detailsChange)="changeMyDish($event)"
+                (allergiesChange)="changeMyAllergies($event)"
               />
             </li>
           }
@@ -132,6 +199,18 @@
             </ul>
           }
         </section>
+        }
+
+        @if (paymentOpen() && payment(); as paymentView) {
+          <app-payment-panel
+            [view]="paymentView"
+            [busy]="paymentBusy()"
+            (modeChange)="choosePaymentMode($event)"
+            (sendLinks)="sendPaymentLinks()"
+            (markPaid)="markPaid($event)"
+            (remindUnpaid)="remindUnpaid()"
+          />
+        }
 
         <footer class="summary">
           <p class="grand-total">
@@ -148,10 +227,13 @@
             >
               Submit Pre-Order
             </button>
-          } @else {
-            <button type="button" class="button button--primary button--extra-large button--full-width" disabled>
-              {{ status() === 'Submitted' ? 'Pre-Order Sent' : 'Pre-Order Closed' }}
+          } @else if (status() === 'Submitted') {
+            <!-- US17 AC1: after submit the CTA becomes "Choose how to pay" -->
+            <button type="button" class="button button--primary button--extra-large button--full-width" (click)="togglePayment()">
+              {{ paymentOpen() ? 'Hide payment' : 'Choose how to pay' }}
             </button>
+          } @else {
+            <button type="button" class="button button--primary button--extra-large button--full-width" disabled>Pre-Order Closed</button>
           }
         </footer>
       }

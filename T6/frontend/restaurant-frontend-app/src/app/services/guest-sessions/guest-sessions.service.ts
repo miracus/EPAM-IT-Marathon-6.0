@@ -1,6 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpHeaders } from '@angular/common/http';
 import { API_BASE_URL } from '@app/shared/config/api-base-url.token';
+import { SKIP_ERROR_TOAST } from '@app/auth/skip-error-toast.context';
+import { GuestPaymentShare, GuestSessionInfo } from '@app/models/group-orders/guest-session.model';
+import { GroupStatusResponse } from '@app/models/group-orders/group-status.model';
+import { DishDetailsRequest } from '@app/models/group-orders/group-actions.model';
 
 export interface CreateGuestSessionRequest {
     groupReservationId: string;
@@ -72,6 +76,59 @@ export class GuestSessionsService {
             {},
             { headers: this.authHeaders(sessionToken) }
         );
+    }
+
+    // ---- Group pre-order extensions (US13–US21), guest side
+
+    /** The guest's cart, notices, cut-off and payment share. Background call: no error toast. */
+    getSession(guestSessionId: string, sessionToken: string) {
+        return this.http.get<GuestSessionInfo>(`${this.baseUrl}/guest/sessions/${guestSessionId}`, {
+            headers: this.authHeaders(sessionToken),
+            context: new HttpContext().set(SKIP_ERROR_TOAST, true),
+        });
+    }
+
+    /** US16 AC5: tells a guest whose session is gone that the organizer removed them. */
+    getGroupStatus(groupReservationId: string, guestSessionId: string) {
+        return this.http.get<GroupStatusResponse>(`${this.baseUrl}/guest/groups/${groupReservationId}/status`, {
+            params: { guestSessionId },
+            context: new HttpContext().set(SKIP_ERROR_TOAST, true),
+        });
+    }
+
+    /** US18/US19: note and serving time of a dish. */
+    updateDish(guestSessionId: string, sessionToken: string, dishId: string, body: DishDetailsRequest) {
+        return this.http.put(`${this.baseUrl}/guest/sessions/${guestSessionId}/dishes/${encodeURIComponent(dishId)}`, body, {
+            headers: this.authHeaders(sessionToken),
+        });
+    }
+
+    /** US18: allergies or dietary needs. */
+    updateAllergies(guestSessionId: string, sessionToken: string, allergies: string) {
+        return this.http.put(`${this.baseUrl}/guest/sessions/${guestSessionId}/allergies`, { allergies }, {
+            headers: this.authHeaders(sessionToken),
+        });
+    }
+
+    /** US16: "OK, got it". */
+    acknowledgeNotices(guestSessionId: string, sessionToken: string) {
+        return this.http.post(`${this.baseUrl}/guest/sessions/${guestSessionId}/notices/ack`, {}, {
+            headers: this.authHeaders(sessionToken),
+        });
+    }
+
+    /** US16 AC3 "Pick another dish": edit a submitted cart again. */
+    reopen(guestSessionId: string, sessionToken: string) {
+        return this.http.post(`${this.baseUrl}/guest/sessions/${guestSessionId}/reopen`, {}, {
+            headers: this.authHeaders(sessionToken),
+        });
+    }
+
+    /** US17: simulated payment of the guest's share. */
+    pay(guestSessionId: string, sessionToken: string) {
+        return this.http.post<GuestPaymentShare>(`${this.baseUrl}/guest/sessions/${guestSessionId}/pay`, {}, {
+            headers: this.authHeaders(sessionToken),
+        });
     }
 
     private authHeaders(token: string) {

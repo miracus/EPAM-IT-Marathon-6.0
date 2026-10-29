@@ -1,4 +1,5 @@
 using APIHandler.Models.Orders;
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -19,6 +20,32 @@ public record GetAllSessionsResponse(IEnumerable<Participant> Participants, deci
 
     /// <summary>Open / Submitted / Closed.</summary>
     public string? GroupStatus { get; init; }
+
+    /// <summary>US13: when changes close (same time representation as the reservation start time).</summary>
+    public DateTime? CutoffAt { get; init; }
+
+    /// <summary>US13: seconds left until the cut-off, computed on the server (0 when passed).</summary>
+    public long SecondsUntilCutoff { get; init; }
+
+    /// <summary>US13 AC3: true after submit or after the cut-off — no more changes.</summary>
+    public bool IsLocked { get; init; }
+
+    /// <summary>US13 AC2/AC5: when the pre-order was sent and whether it was sent automatically.</summary>
+    public DateTime? SubmittedAt { get; init; }
+
+    public bool SubmittedAutomatically { get; init; }
+
+    /// <summary>US14 AC3.</summary>
+    public bool AutoRemind { get; init; }
+
+    /// <summary>US17: chosen payment mode, null until chosen.</summary>
+    public string? PaymentMode { get; init; }
+
+    /// <summary>Guest count of the reservation (US20 "4 of 5 joined").</summary>
+    public int MaxGuests { get; init; }
+
+    /// <summary>Reservation status: Reserved / Cancelled / InProgress / Completed (US21).</summary>
+    public string? ReservationStatus { get; init; }
 }
 
 public record Participant(
@@ -27,7 +54,20 @@ public record Participant(
     string Name,
     IEnumerable<OrderItemResponse> Items,
     decimal Total,
-    bool IsSubmitted);
+    bool IsSubmitted)
+{
+    /// <summary>US18 AC2: allergies or dietary needs, shown as a red chip.</summary>
+    public string? Allergies { get; init; }
+
+    /// <summary>US15 AC3: "Changed by you".</summary>
+    public bool ChangedByOwner { get; init; }
+
+    /// <summary>US14 AC4: last reminder time.</summary>
+    public DateTime? LastRemindedAt { get; init; }
+
+    /// <summary>US17: payment status of the participant's share.</summary>
+    public bool IsPaid { get; init; }
+}
 
 /// <summary>One dish across the whole group. Unavailable dishes are listed but not counted in totals.</summary>
 public record DishSummary(string DishId, string Name, int Quantity, decimal Total, bool IsAvailable);

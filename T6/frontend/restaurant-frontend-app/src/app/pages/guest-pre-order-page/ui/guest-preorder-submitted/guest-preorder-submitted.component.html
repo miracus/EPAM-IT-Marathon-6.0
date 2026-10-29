@@ -46,7 +46,10 @@
         <div class="items">
             @for (it of items(); track it.dishId) {
             <div class="item-row">
-                <span class="item-title">{{ it.title }} × {{ it.qty }}</span>
+                <span class="item-title">
+                    {{ it.title }} × {{ it.qty }}
+                    @if (it.note) { <em class="item-note">“{{ it.note }}”</em> }
+                </span>
                 <span class="item-price">{{ it.price * it.qty | currency: '$' }}</span>
             </div>
             }
@@ -57,8 +60,15 @@
             <strong class="total-value">{{ total() | currency: '$' }}</strong>
         </div>
 
-        <app-custom-button variant="secondary" fullWidth (click)="createNew.emit()">
-            Create New Pre-Order
-        </app-custom-button>
+        @if (locked()) {
+            <p class="locked-note">Order was sent — contact the organizer to change it.</p>
+        } @else {
+            <app-custom-button variant="primary" fullWidth (click)="editOrder.emit()">
+                Edit my order
+            </app-custom-button>
+            <app-custom-button variant="secondary" fullWidth (click)="createNew.emit()">
+                Create New Pre-Order
+            </app-custom-button>
+        }
     </div>
 </div>

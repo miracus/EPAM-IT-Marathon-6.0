@@ -207,6 +207,17 @@
     }
 
     @if (role() === Roles.CUSTOMER) {
+      <!-- US21: a finished group visit can be booked again with the same people -->
+      @if (r().status === ReservationStatusCustomer.Finished && r().guestCount >= 2) {
+        <button
+          type="button"
+          class="button button--secondary button--large"
+          (click)="onGroupPreOrder()"
+        >
+          Book again
+        </button>
+      }
+
       @if (
         r().status !==
         ReservationStatusCustomer.Reserved &&

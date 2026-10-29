@@ -33,3 +33,7 @@ syndicate_venv/
 .syndicate-config-*/logs/
 .syndicate
 _project_export.tgz
+
+# Offline NuGet packages used to build the backend without nuget.org
+nuget-offline.zip
+nuget-offline/

@@ -5,15 +5,15 @@ import { SubmittedDish } from '@app/models/group-orders/submit-group-pre-order.m
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
 
 /**
- * DEV-ONLY in-memory «бекенд» для групового pre-order.
- * Повторює правила з homework-backend.md. Скидається після перезавантаження сторінки.
+ * DEV-ONLY in-memory "backend" for the group pre-order.
+ * Follows the rules of homework-backend.md. Resets after a page reload.
  */
 export const DEMO_RESERVATION_ID = 'demo-reservation';
 export const DEMO_GROUP_ID = 'demo-group';
 export const DEMO_INVITE_TOKEN = 'demo-invite-token';
 export const DEMO_OWNER_SESSION_ID = 'gs-owner';
 
-/** Відповідь GET /guest/invites/{token} для демо-бронювання (поля — як у GuestInvite). */
+/** Response of GET /guest/invites/{token} for the demo reservation (fields as in GuestInvite). */
 export const DEMO_INVITE: GuestInvite = {
   GroupReservationId: DEMO_GROUP_ID,
   LocationId: 'demo-location',

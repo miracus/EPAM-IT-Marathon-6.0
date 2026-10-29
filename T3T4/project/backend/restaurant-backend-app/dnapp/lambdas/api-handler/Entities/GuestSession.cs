@@ -1,5 +1,6 @@
 ﻿using Amazon.DynamoDBv2.DataModel;
 using APIHandler.Constants;
+using System;
 using System.Collections.Generic;
 
 namespace APIHandler.Entities;
@@ -35,4 +36,26 @@ public class GuestSession
     /// <summary>Changes made by the reservation owner that the guest has not acknowledged yet (US16).</summary>
     [DynamoDBProperty("notices")]
     public List<GuestNotice>? Notices { get; set; }
+
+    /// <summary>Allergies or dietary needs stated by the participant (US18).</summary>
+    [DynamoDBProperty("allergies")]
+    public string? Allergies { get; set; }
+
+    /// <summary>The owner changed this guest's order (US15 "Changed by you").</summary>
+    [DynamoDBProperty("changedByOwner")]
+    public bool ChangedByOwner { get; set; }
+
+    /// <summary>Last manual or automatic reminder (US14, one per 15 minutes).</summary>
+    [DynamoDBProperty("lastRemindedAt")]
+    public DateTime? LastRemindedAt { get; set; }
+
+    /// <summary>Payment status of the participant's share (US17, simulated).</summary>
+    [DynamoDBProperty("isPaid")]
+    public bool IsPaid { get; set; }
+
+    [DynamoDBProperty("paidAt")]
+    public DateTime? PaidAt { get; set; }
+
+    [DynamoDBProperty("paymentLinkSentAt")]
+    public DateTime? PaymentLinkSentAt { get; set; }
 }

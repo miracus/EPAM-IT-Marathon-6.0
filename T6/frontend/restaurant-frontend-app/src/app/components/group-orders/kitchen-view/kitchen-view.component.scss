@@ -1,0 +1,54 @@
+@use 'app/shared/styles/abstracts/colors' as color;
+
+.kitchen {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 12px;
+  background-color: color.$neutral-0;
+}
+
+.allergy-banner {
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: color.$red-400;
+  background-color: color.$red-100;
+}
+
+.section-title {
+  margin-top: 8px;
+  color: color.$green-800;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.lines {
+  list-style: none;
+}
+
+.line {
+  padding: 8px 0;
+  border-bottom: 1px solid color.$neutral-100;
+}
+
+.line-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.price {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.note {
+  margin-top: 2px;
+  color: color.$neutral-600;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.empty {
+  color: color.$neutral-400;
+}

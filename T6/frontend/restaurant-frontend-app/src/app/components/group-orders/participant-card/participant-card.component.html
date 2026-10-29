@@ -2,7 +2,9 @@
   <header class="card-header">
     <div class="heading">
       <h2 class="title">{{ title() }}</h2>
-      @if (participant().isSubmitted) {
+      @if (participant().changedByOwner && isGuest()) {
+        <span class="chip changed">Changed by you</span>
+      } @else if (participant().isSubmitted) {
         <span class="chip submitted">
           <span class="chip-dot" aria-hidden="true"></span>
           Submitted
@@ -13,30 +15,154 @@
           Still choosing
         </span>
       }
+      @if (participant().allergies) {
+        <span class="chip allergy" [attr.aria-label]="'Allergies: ' + participant().allergies">{{ participant().allergies }}</span>
+      }
     </div>
 
-    @if (canRemove()) {
-      <button type="button" class="remove" [attr.aria-label]="removeLabel()" (click)="onRemove()">Remove Guest</button>
-    }
+    <div class="header-actions">
+      @if (canRemove()) {
+        <button type="button" class="remove" [attr.aria-label]="removeLabel()" (click)="onRemove()">Remove Guest</button>
+      }
+      @if (canManageGuest()) {
+        <div class="menu">
+          <button
+            type="button"
+            class="menu-toggle"
+            [attr.aria-label]="'More actions for ' + participant().name"
+            [attr.aria-expanded]="menuOpen()"
+            (click)="toggleMenu()"
+          >
+            ⋯
+          </button>
+          @if (menuOpen()) {
+            <ul class="menu-list" role="menu">
+              <li role="none"><button type="button" role="menuitem" (click)="onRemind()">Remind {{ participant().name }}</button></li>
+              <li role="none"><button type="button" role="menuitem" (click)="onAskChange()">Ask to change order</button></li>
+              <li role="none"><button type="button" role="menuitem" class="danger" (click)="onRemove()">Remove from group</button></li>
+            </ul>
+          }
+        </div>
+      }
+    </div>
   </header>
 
-  @if (participant().items.length) {
+  @if (participant().items.length || removedLines().length) {
     <ul class="items">
       @for (item of participant().items; track item.dish.id) {
-        <li class="item">
+        <li class="item" [class.item--new]="isNew(item)">
           @if (item.dish.imageUrl) {
             <img class="avatar" [src]="item.dish.imageUrl" alt="" width="40" height="40" loading="lazy" />
           } @else {
             <span class="avatar initial" aria-hidden="true">{{ item.dish.name.charAt(0) }}</span>
           }
-          <p class="name">{{ item.dish.name }}</p>
+          <div class="details">
+            <p class="name">
+              {{ item.dish.name }}
+              @if (isNew(item)) {
+                <span class="tag-new">NEW</span>
+              }
+              @if (showServeChip(item) && item.serveTime) {
+                <span class="chip serve">{{ serveLabels[item.serveTime] }}</span>
+              }
+            </p>
+            @if (item.note && editingNoteFor() !== item.dish.id) {
+              <p class="note">“{{ item.note }}”</p>
+            }
+            @if (canEditOwn()) {
+              @if (editingNoteFor() === item.dish.id) {
+                <div class="note-editor">
+                  <input
+                    class="note-input"
+                    type="text"
+                    [attr.aria-label]="'Note for ' + item.dish.name"
+                    [maxLength]="noteMax"
+                    [value]="noteDraft()"
+                    (input)="onNoteInput($event)"
+                    (keydown.enter)="saveNote(item)"
+                    (keydown.escape)="cancelNote()"
+                  />
+                  <span class="counter">{{ noteDraft().length }}/{{ noteMax }}</span>
+                  <button type="button" class="link" (click)="saveNote(item)">Save</button>
+                  <button type="button" class="link link--muted" (click)="cancelNote()">Cancel</button>
+                </div>
+              } @else {
+                <div class="own-actions">
+                  <button type="button" class="link" (click)="startNote(item)">{{ item.note ? 'Edit note' : '+ Add note' }}</button>
+                  <label class="serve-select">
+                    Serve:
+                    <select [value]="item.serveTime ?? 'OnArrival'" (change)="onServeChange(item, $event)">
+                      @for (option of serveOptions; track option) {
+                        <option [value]="option">{{ serveLabels[option] }}</option>
+                      }
+                    </select>
+                  </label>
+                </div>
+              }
+            }
+          </div>
           <p class="qty"><span class="visually-hidden">Quantity: </span>× {{ item.quantity }}</p>
           <p class="price">{{ item.dish.price * item.quantity | currency }}</p>
+          <div class="line-action">
+            @if (canManageGuest()) {
+              <button type="button" class="icon-btn" [attr.aria-label]="'Remove ' + item.dish.name" (click)="onRemoveDish(item)">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12l-1 12H7L6 9zm4 2v8h2v-8h-2zm4 0v8h2v-8h-2z" fill="currentColor" />
+                </svg>
+              </button>
+            } @else if (locked() && isGuest()) {
+              <svg class="lock" viewBox="0 0 24 24" width="16" height="16" role="img" aria-label="Locked">
+                <path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1zm2 0h6V7a3 3 0 0 0-6 0v3z" fill="currentColor" />
+              </svg>
+            }
+          </div>
+        </li>
+      }
+      @for (line of removedLines(); track line.dishId) {
+        <li class="removed" role="status">
+          <span><strong>{{ line.dishName }}</strong> removed — {{ line.participantName }} will be notified</span>
+          <button type="button" class="link" (click)="undo.emit(line)">Undo</button>
         </li>
       }
     </ul>
   } @else {
-    <p class="empty">No dishes yet</p>
+    <p class="empty">
+      No dishes yet
+      @if (canManageGuest()) {
+        <button type="button" class="link" (click)="onRemind()">
+          Remind
+          @if (participant().lastRemindedAt) {
+            <span class="muted">(last at {{ participant().lastRemindedAt | date: 'HH:mm' }})</span>
+          }
+        </button>
+      }
+    </p>
+  }
+
+  @if (canEditOwn()) {
+    <div class="allergies">
+      @if (editingAllergies()) {
+        <label class="allergies-label" for="own-allergies">Allergies or dietary needs</label>
+        <div class="note-editor">
+          <input
+            id="own-allergies"
+            class="note-input"
+            type="text"
+            maxlength="120"
+            placeholder="e.g. Nut allergy, vegetarian"
+            [value]="allergiesDraft()"
+            (input)="onAllergiesInput($event)"
+            (keydown.enter)="saveAllergies()"
+          />
+          <button type="button" class="link" (click)="saveAllergies()">Save</button>
+          <button type="button" class="link link--muted" (click)="editingAllergies.set(false)">Cancel</button>
+        </div>
+      } @else {
+        <button type="button" class="link" (click)="startAllergies()">
+          {{ participant().allergies ? 'Edit allergies or dietary needs' : '+ Allergies or dietary needs' }}
+        </button>
+      }
+    </div>
   }
 
   <p class="subtotal"><span>Subtotal</span><span>{{ participant().total | currency }}</span></p>

@@ -38,4 +38,14 @@ public class Order
     [DynamoDBProperty("status", typeof(EnumAsIntConverter<OrderStatus>))]
     [JsonPropertyName("status")]
     public OrderStatus Status { get; set; }
+
+    /// <summary>Per-person notes and serving times of a group pre-order, for the kitchen (US18 AC5, US19).</summary>
+    [DynamoDBProperty("kitchenNotes")]
+    [JsonPropertyName("kitchenNotes")]
+    public List<KitchenNote>? KitchenNotes { get; set; }
+
+    /// <summary>Allergies of the group participants (US18 AC5).</summary>
+    [DynamoDBProperty("allergies")]
+    [JsonPropertyName("allergies")]
+    public List<ParticipantAllergy>? Allergies { get; set; }
 }

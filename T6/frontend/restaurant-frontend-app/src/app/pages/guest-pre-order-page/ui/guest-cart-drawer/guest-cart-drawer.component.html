@@ -24,14 +24,46 @@
 
                             <div class="info">
                                 <div class="name">{{ it.title }}</div>
-                                <div class="sub">Expected ready time - 10 minutes</div>
+                                @if (it.note && editingNoteFor() !== it.dishId) {
+                                    <div class="note">“{{ it.note }}”</div>
+                                }
+                                @if (editingNoteFor() === it.dishId) {
+                                    <div class="note-editor">
+                                        <input
+                                            class="note-input"
+                                            type="text"
+                                            [attr.aria-label]="'Note for ' + it.title"
+                                            [maxLength]="noteMax"
+                                            [value]="noteDraft()"
+                                            (input)="onNoteInput($event)"
+                                            (keydown.enter)="saveNote(it)"
+                                        />
+                                        <span class="counter">{{ noteDraft().length }}/{{ noteMax }}</span>
+                                        <button type="button" class="link" (click)="saveNote(it)">Save</button>
+                                        <button type="button" class="link link--muted" (click)="editingNoteFor.set(null)">Cancel</button>
+                                    </div>
+                                } @else if (!locked()) {
+                                    <div class="extras">
+                                        <button type="button" class="link" [disabled]="busy()" (click)="startNote(it)">{{ it.note ? 'Edit note' : '+ Add note' }}</button>
+                                        <label class="serve">
+                                            Serve:
+                                            <select [value]="it.serveTime ?? 'OnArrival'" [disabled]="busy()" (change)="onServeChange(it, $event)">
+                                                @for (option of serveOptions; track option) {
+                                                    <option [value]="option">{{ serveLabels[option] }}</option>
+                                                }
+                                            </select>
+                                        </label>
+                                    </div>
+                                } @else if (it.serveTime) {
+                                    <div class="sub">Serve: {{ serveLabels[it.serveTime] }}</div>
+                                }
 
                                 <div class="qty">
-                                    <button type="button" class="qty-btn" [disabled]="busy()" (click)="dec.emit(it.dishId)" aria-label="Decrease quantity">
+                                    <button type="button" class="qty-btn" [disabled]="busy() || locked()" (click)="dec.emit(it.dishId)" aria-label="Decrease quantity">
                                         -
                                     </button>
                                     <span class="qty-value">{{ it.qty }}</span>
-                                    <button type="button" class="qty-btn" [disabled]="busy()" (click)="inc.emit(it.dishId)" aria-label="Increase quantity">
+                                    <button type="button" class="qty-btn" [disabled]="busy() || locked()" (click)="inc.emit(it.dishId)" aria-label="Increase quantity">
                                         +
                                     </button>
                                 </div>
@@ -41,7 +73,7 @@
                                 <button 
                                     type="button"
                                     class="trash"
-                                    [disabled]="busy()"
+                                    [disabled]="busy() || locked()"
                                     (click)="remove.emit(it.dishId)"
                                     aria-label="Remove item"
                                 >
@@ -52,6 +84,29 @@
                             </div>
                         </div>
                     }
+                    @for (gone of removed(); track gone.id) {
+                        <div class="item item--removed">
+                            <div class="info">
+                                <div class="name"><s>{{ gone.dishName }}</s> <span class="removed-tag">Removed by {{ gone.actorName || 'the organizer' }}</span></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="allergies">
+                    <label class="allergies-label" for="guest-allergies">Allergies or dietary needs</label>
+                    <input
+                        id="guest-allergies"
+                        class="note-input"
+                        type="text"
+                        maxlength="120"
+                        placeholder="e.g. Nut allergy, vegetarian"
+                        [value]="allergiesDraft() ?? allergies()"
+                        [disabled]="locked() || busy()"
+                        (input)="onAllergiesInput($event)"
+                        (blur)="saveAllergies()"
+                        (keydown.enter)="saveAllergies()"
+                    />
                 </div>
 
                 <div class="footer">
@@ -66,7 +121,7 @@
                     <button
                         type="button"
                         class="submit"
-                        [disabled]="items().length === 0 || busy()"
+                        [disabled]="items().length === 0 || busy() || locked()"
                         (click)="submitted.emit()"
                     >
                     {{ busy() ? 'Please wait...' : 'Submit Pre-Order' }}

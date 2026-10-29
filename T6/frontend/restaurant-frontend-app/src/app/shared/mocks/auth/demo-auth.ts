@@ -3,10 +3,10 @@ import { UserModel } from '@app/auth/models/user.model';
 import { Roles } from '@app/shared/constants/roles';
 
 /**
- * DEV-ONLY мок-авторизація для домашки (рівні 1–2).
- * Відкрий будь-яку сторінку з параметром ?demo — і ти залогінений як Owner демо-бронювання.
- * Реєстрація, логін і бекенд не потрібні. Вийти — кнопка Sign out у шапці.
- * Для рівня 3 (справжній бекенд) вийди з демо і залогінься справжнім акаунтом.
+ * DEV-ONLY mock authorization for the homework (levels 1–2).
+ * Open any page with the ?demo parameter and you are logged in as the Owner of the demo reservation.
+ * No registration, login or backend needed. To leave, use Sign out in the header.
+ * For level 3 (the real backend) leave the demo and log in with a real account.
  */
 export const DEMO_LOGIN_PARAM = 'demo';
 export const DEMO_ISSUER = 'green-and-tasty-demo';
@@ -22,7 +22,7 @@ export const DEMO_USER: UserModel = {
 const base64Url = (value: object): string =>
   btoa(unescape(encodeURIComponent(JSON.stringify(value)))).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-/** Непідписаний JWT: фронтенд токен лише декодує (exp, ролі), а перевіряє його тільки бекенд. */
+/** Unsigned JWT: the frontend only decodes the token (exp, roles); only the backend verifies it. */
 export function createDemoTokens(now = Date.now()): Tokens {
   const iat = Math.floor(now / 1000);
   const payload = {
@@ -39,7 +39,7 @@ export function createDemoTokens(now = Date.now()): Tokens {
   return { idToken: token, accessToken: token };
 }
 
-/** true, якщо запит іде з демо-токеном (його бачить мок-бекенд після tokenInterceptor). */
+/** true when the request carries the demo token (the mock backend sees it after tokenInterceptor). */
 export function isDemoAuthorization(header: string | null): boolean {
   if (!header?.startsWith('Bearer ')) return false;
   try {
@@ -51,8 +51,8 @@ export function isDemoAuthorization(header: string | null): boolean {
 }
 
 /**
- * Викликається один раз на старті застосунку (лише в dev). Якщо в URL є ?demo —
- * кладе демо-токени і користувача в localStorage і прибирає параметр з адреси.
+ * Called once at app start (dev only). If the URL has ?demo,
+ * stores the demo tokens and user in localStorage and removes the parameter from the URL.
  */
 export function applyDemoLoginFromUrl(
   location: Pick<Location, 'href'> = window.location,

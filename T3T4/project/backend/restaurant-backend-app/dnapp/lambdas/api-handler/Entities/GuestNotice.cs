@@ -20,4 +20,29 @@ public class GuestNotice
 
     [DynamoDBProperty("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>One of <see cref="Constants.GuestNoticeTypes"/>. Null in notices stored before US14/US17.</summary>
+    [DynamoDBProperty("type")]
+    public string? Type { get; set; }
+
+    /// <summary>Who made the change (the owner's first name).</summary>
+    [DynamoDBProperty("actorName")]
+    public string? ActorName { get; set; }
+
+    [DynamoDBProperty("dishName")]
+    public string? DishName { get; set; }
+
+    [DynamoDBProperty("quantity")]
+    public int? Quantity { get; set; }
+
+    /// <summary>Guest's cart total before and after the change (US16 AC1).</summary>
+    [DynamoDBProperty("oldTotal")]
+    public decimal? OldTotal { get; set; }
+
+    [DynamoDBProperty("newTotal")]
+    public decimal? NewTotal { get; set; }
+
+    /// <summary>Amount to pay for payment requests (US17).</summary>
+    [DynamoDBProperty("amount")]
+    public decimal? Amount { get; set; }
 }
