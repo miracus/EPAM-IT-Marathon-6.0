@@ -42,6 +42,7 @@ PNG усіх станів лежать у папках `screens/` кожної �
 | Бекенд (.NET Lambda, групове передзамовлення) | `T3T4/project/backend/restaurant-backend-app` |
 | Фронтенд (Angular, сторінка організатора і гостя) | `T6/frontend/restaurant-frontend-app` |
 | Тестування (QA, US11 Menu) | `T7/` |
+| Автоматизація тестів (AQA, груповий pre-order L1–L3) | `aqa/restaurant-aqa-framework` — див. його README |
 
 ## Як здати
 
