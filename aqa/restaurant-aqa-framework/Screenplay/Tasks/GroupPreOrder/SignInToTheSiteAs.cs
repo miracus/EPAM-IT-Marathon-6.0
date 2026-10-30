@@ -22,6 +22,10 @@ public sealed class SignInToTheSiteAs(string persona) : ITask
 
         var account = await Accounts.OfAsync(actor, persona);
         await actor.AttemptsToAsync(new SignInThroughTheLoginForm(account.Email, account.Password));
+
+        // After the token the storefront loads the profile (role, name). Leaving the page before that finishes
+        // loses the session, so wait until the profile is stored.
+        await actor.LookingAtThePage().WaitForFunctionAsync("() => localStorage.getItem('user') !== null");
         actor.Remember(new SignedInOnTheSite(persona));
     }
 }

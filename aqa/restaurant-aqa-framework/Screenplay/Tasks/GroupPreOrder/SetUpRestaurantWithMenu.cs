@@ -24,6 +24,17 @@ public sealed class SetUpRestaurantWithMenu(IReadOnlyList<(string Dish, decimal 
             () => locations.CreateLocationAsync(SampleDataFactory.CreateLocationRequest(), token));
         cleanup.TrackDelete($"location:{location.Id}", () => locations.DeleteLocationAsync(location.Id, force: true, bearerToken: token));
 
+        // The waiter goes on the location's list first and signs in again, so the token carries the waiter role:
+        // removing a table needs it. Cleanup runs in reverse, so the waiter leaves the list only after the
+        // dishes and the table are gone.
+        var waiters = new WaitersApi(actor.UsingTheApi());
+        var added = await waiters.AddWaiterAsync(waiter.Email, location.Id, token);
+        await actor.TheLastResponse().CaptureAsync(added);
+        if (!added.Ok)
+            throw new InvalidOperationException($"Putting the waiter on the location's list failed with {added.Status}: {actor.TheLastResponse().Body}");
+        cleanup.TrackDelete($"waiter:{waiter.Email}", () => waiters.RemoveWaiterAsync(waiter.Email, location.Id, token));
+        token = (await Accounts.RefreshAsync(actor, Personas.Waiter)).IdToken;
+
         var dishesApi = new DishesApi(actor.UsingTheApi());
         var dishes = new Dictionary<string, DishResponse>(StringComparer.Ordinal);
         foreach (var (name, price) in menu)
@@ -38,16 +49,6 @@ public sealed class SetUpRestaurantWithMenu(IReadOnlyList<(string Dish, decimal 
         var table = await CreateAsync<TableResponse>(actor, "the table",
             () => tables.CreateTableAsync(SampleDataFactory.CreateTableRequest(location.Id, tableSeats), token));
         cleanup.TrackDelete($"table:{table.Id}", () => tables.DeleteTableAsync(table.Id, token));
-
-        var waiters = new WaitersApi(actor.UsingTheApi());
-        var added = await waiters.AddWaiterAsync(waiter.Email, location.Id, token);
-        await actor.TheLastResponse().CaptureAsync(added);
-        if (!added.Ok)
-            throw new InvalidOperationException($"Putting the waiter on the location's list failed with {added.Status}: {actor.TheLastResponse().Body}");
-        cleanup.TrackDelete($"waiter:{waiter.Email}", () => waiters.RemoveWaiterAsync(waiter.Email, location.Id, token));
-
-        // The role is read from the token, so the waiter signs in again now that it is on the list.
-        await Accounts.RefreshAsync(actor, Personas.Waiter);
 
         actor.Remember(new Restaurant(location.Id, location.Address, table.Id, dishes));
     }
