@@ -14,7 +14,7 @@ public static class ApiResponseExtensions
     }
 
     /// <summary>
-    /// The backend's error shape is <c>{"error": "..."}</c> (ResponseBuilder.CreateErrorResponse) for
+    /// The backend's error shape is <c>{"error": "..."}</c> (or <c>{"message": "..."}</c> for validation errors) (ResponseBuilder.CreateErrorResponse) for
     /// almost every resource, but a few handlers (e.g. POST /tables) return a plain-text 400 body instead
     /// of JSON. This falls back to the raw body so callers never throw while reading an error message.
     /// </summary>
@@ -26,6 +26,11 @@ public static class ApiResponseExtensions
             var parsed = JsonSerializer.Deserialize<JsonElement>(json);
             if (parsed.ValueKind == JsonValueKind.Object && parsed.TryGetProperty("error", out var error))
                 return error.GetString() ?? json;
+
+            // Validation errors (ResponseBuilder.CreateErrorCodeResponse) use {"message": "...", "errorCode": "..."}.
+            if (parsed.ValueKind == JsonValueKind.Object && parsed.TryGetProperty("message", out var message)
+                && message.ValueKind == JsonValueKind.String)
+                return message.GetString() ?? json;
         }
         catch (JsonException)
         {

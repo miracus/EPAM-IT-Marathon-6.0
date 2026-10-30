@@ -8,7 +8,8 @@ public sealed class ReservationDashboardPage(IPage page) : BasePage(page)
     public HeaderComponent Header { get; } = new(page);
     public CartComponent Cart { get; } = new(page);
 
-    private ILocator ReservationCards => Page.Locator("ul.reservation-list > li.card");
+    // Each card is rendered by `app-card-reservation` inside the list item, so the card is a descendant, not a child.
+    private ILocator ReservationCards => Page.Locator("ul.reservation-list li.card");
     public ILocator EmptyState => Page.Locator(".reservation-empty");
 
     public Task NavigateAsync() => NavigateToAsync("/reservations");
