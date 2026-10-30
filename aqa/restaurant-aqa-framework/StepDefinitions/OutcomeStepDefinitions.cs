@@ -19,6 +19,54 @@ public sealed class OutcomeStepDefinitions(Actor actor) : StepDefinitionBase(act
         await Assert.That(outcome.ErrorMessage).IsEqualTo(message);
     }
 
+    [Then("the organizer is told {string}")]
+    [Scope(Tag = "api")]
+    public async Task ThenTheOrganizerIsTold(string message)
+    {
+        var outcome = await Actor.AsksForAsync(new TheOutcome());
+
+        await Assert.That(outcome.Succeeded).IsFalse().Because($"the request unexpectedly succeeded: {outcome.Body}");
+        await Assert.That(outcome.ErrorMessage).IsEqualTo(message).Because($"response {outcome.Status}: {outcome.Body}");
+    }
+
+    /// <summary>Signed in, but not the organizer of this group: forbidden, with the backend's explanation.</summary>
+    [Then("they are told that only the organizer can do this")]
+    public async Task ThenTheyAreToldOnlyTheOrganizerCan()
+    {
+        var outcome = await Actor.AsksForAsync(new TheOutcome());
+
+        await Assert.That(outcome.Status).IsEqualTo(403).Because($"response body was: {outcome.Body}");
+        await Assert.That(outcome.ErrorMessage).IsEqualTo("Only the reservation owner can perform this action.");
+    }
+
+    /// <summary>No account session (no token, or a guest's session token): the gateway refuses before the service runs.</summary>
+    [Then("they are asked to sign in first")]
+    public async Task ThenTheyAreAskedToSignIn()
+    {
+        var outcome = await Actor.AsksForAsync(new TheOutcome());
+        await Assert.That(outcome.Status).IsEqualTo(401).Because($"response body was: {outcome.Body}");
+    }
+
+    [Then("the organizer is told that the guest could not be found")]
+    public async Task ThenTheOrganizerIsToldTheGuestIsMissing()
+    {
+        var outcome = await Actor.AsksForAsync(new TheOutcome());
+
+        await Assert.That(outcome.Status).IsEqualTo(404).Because($"response body was: {outcome.Body}");
+        await Assert.That(outcome.ErrorMessage).Contains("not found");
+    }
+
+    /// <summary>Guests confirmed dishes, but the reservation itself has no order the dishes could be added to.</summary>
+    [Then("the organizer is told that the reservation has no order to send")]
+    public async Task ThenTheOrganizerIsToldThereIsNoOrder()
+    {
+        var outcome = await Actor.AsksForAsync(new TheOutcome());
+
+        await Assert.That(outcome.Status).IsEqualTo(400).Because($"response body was: {outcome.Body}");
+        await Assert.That(outcome.ErrorMessage).StartsWith("Order for reservation");
+        await Assert.That(outcome.ErrorMessage).EndsWith("was not found.");
+    }
+
     [Then("sign-in is refused")]
     public async Task ThenSignInIsRefused()
     {

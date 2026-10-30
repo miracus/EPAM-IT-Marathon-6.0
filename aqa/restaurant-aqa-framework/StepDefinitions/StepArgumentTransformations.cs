@@ -1,4 +1,5 @@
 using Restaurant_Aqa_Framework.Api.Dtos.Dishes;
+using Restaurant_Aqa_Framework.Screenplay.GroupPreOrder;
 using Restaurant_Aqa_Framework.Support;
 
 namespace Restaurant_Aqa_Framework.StepDefinitions;
@@ -75,6 +76,19 @@ public static class StepArgumentTransformations
     [StepArgumentTransformation(Name = "information", Regex = "(dish catalog|popular dishes|list of locations)")]
     public static string ToInformation(string value) => value;
 
+    /// <summary>Someone other than the organizer of a group pre-order (see <see cref="Personas"/>).</summary>
+    [StepArgumentTransformation(Name = "someone", Regex = "(another customer|the waiter|a guest of the group|an anonymous visitor)")]
+    public static string ToSomeone(string value) => value;
+
     [StepArgumentTransformation]
     public static Fields ToFields(DataTable table) => Fields.From(table);
+
+    [StepArgumentTransformation]
+    public static Menu ToMenu(DataTable table) => Menu.From(table);
+
+    [StepArgumentTransformation]
+    public static DishOrder ToDishOrder(DataTable table) => DishOrder.From(table);
+
+    [StepArgumentTransformation]
+    public static ExpectedGuests ToExpectedGuests(DataTable table) => ExpectedGuests.From(table);
 }

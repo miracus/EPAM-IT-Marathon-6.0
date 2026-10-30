@@ -7,10 +7,14 @@ on:
         description: "Which scenarios to run"
         type: choice
         options:
-          - all
+          - group-pre-order
+          - L1
+          - L2
+          - L3
           - ui
           - api
-        default: all
+          - all
+        default: group-pre-order
       custom_filter:
         description: >
           Optional Microsoft.Testing.Platform tree filter (overrides "scope" when set), e.g.
@@ -20,10 +24,8 @@ on:
         default: ""
 
   # The scenarios run against the deployed environment and take minutes, so they are not tied to
-  # pushes or pull requests (those run the fast checks in aqa-quality.yml). They run on demand and nightly,
-  # which catches regressions in the environment itself even on days nobody touched the tests.
-  schedule:
-    - cron: "0 2 * * *"
+  # pushes or pull requests (those run the fast checks in aqa-quality.yml). They run on demand only:
+  # every run creates (and removes) data in the AWS account under test, so nothing runs unattended.
 
 concurrency:
   group: aqa-tests-${{ github.ref }}
@@ -44,6 +46,9 @@ jobs:
       # Default anyway (Configuration/Settings.cs) - set explicitly so the choice is visible here:
       # a trace is only captured for a failed @ui scenario (or one tagged @trace-always).
       TRACE_MODE: "OnFailureOnly"
+      # The DynamoDB tables of the environment under test have 1 read/write capacity unit each;
+      # two scenarios at a time keep the run clear of throttling.
+      MAX_PARALLEL_TESTS: "2"
     steps:
       - uses: actions/checkout@v5
 
@@ -110,16 +115,14 @@ jobs:
         shell: bash
         run: |
           custom_filter="${{ inputs.custom_filter }}"
-          scope="${{ inputs.scope || 'all' }}"
+          scope="${{ inputs.scope || 'group-pre-order' }}"
 
           if [ -n "$custom_filter" ]; then
             filter="$custom_filter"
-          elif [ "$scope" = "ui" ]; then
-            filter="/*/*/*/*[Category=ui]"
-          elif [ "$scope" = "api" ]; then
-            filter="/*/*/*/*[Category=api]"
-          else
+          elif [ "$scope" = "all" ]; then
             filter=""
+          else
+            filter="/*/*/*/*[Category=$scope]"
           fi
 
           echo "filter=$filter" >> "$GITHUB_OUTPUT"
@@ -179,7 +182,7 @@ jobs:
       - name: Write job summary
         if: always()
         env:
-          SCOPE: ${{ inputs.scope || 'all' }}
+          SCOPE: ${{ inputs.scope || 'group-pre-order' }}
           FILTER: ${{ steps.filter.outputs.filter }}
           RUN_OUTCOME: ${{ steps.run_tests.outcome }}
         run: |

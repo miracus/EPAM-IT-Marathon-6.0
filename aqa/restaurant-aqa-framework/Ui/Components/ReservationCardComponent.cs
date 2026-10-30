@@ -15,6 +15,12 @@ public sealed class ReservationCardComponent(ILocator root)
     public ILocator LeaveFeedbackButton => root.Locator("button.btn-leave-feedback");
     public ILocator UpdateFeedbackButton => root.Locator("button.btn-update-feedback");
 
+    /// <summary>Customer, a reservation for two or more guests: opens the organizer's group pre-order page.</summary>
+    public ILocator GroupPreOrderButton => root.GetByRole(AriaRole.Button, new() { Name = "Group Pre-Order", Exact = true });
+
+    /// <summary>Waiter: opens the pre-order of the reservation (shown once it has dishes).</summary>
+    public ILocator WaiterPreOrderButton => root.GetByRole(AriaRole.Button, new() { Name = "Pre-order", Exact = true });
+
     public Task CancelAsync() => CancelButton.ClickAsync();
     public Task PreOrderAsync() => PreOrderButton.ClickAsync();
     public Task LeaveFeedbackAsync() => LeaveFeedbackButton.ClickAsync();
