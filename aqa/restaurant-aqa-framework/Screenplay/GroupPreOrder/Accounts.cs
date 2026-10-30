@@ -39,8 +39,9 @@ public static class Accounts
     public static async Task<string?> TokenOfAsync(Actor actor, string persona) => persona switch
     {
         Personas.AnonymousVisitor => null,
-        Personas.GuestOfTheGroup => actor.RecallAll<GuestCart>().FirstOrDefault()?.SessionToken
-            ?? throw new InvalidOperationException("No guest has joined the group yet, so there is no guest to act as."),
+        Personas.GuestOfTheGroup => actor.RecallAll<GuestCart>() is { Count: > 0 } guests
+            ? guests[0].SessionToken
+            : throw new InvalidOperationException("No guest has joined the group yet, so there is no guest to act as."),
         _ => (await OfAsync(actor, persona)).IdToken,
     };
 
